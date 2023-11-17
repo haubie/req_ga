@@ -1,0 +1,1387 @@
+<!-- livebook:{"file_entries":[{"file":{"file_system_id":"local","file_system_type":"local","path":"/Users/haubie/Development/livebook/credentials.json"},"name":"credentials.json","type":"file"}],"persist_outputs":true} -->
+
+# ReqGA demonstration
+
+```elixir
+Mix.install(
+  [
+    {:req_ga, path: "../req_ga"},
+    {:kino_db, "~> 0.2.1"},
+    {:goth, "~> 1.3.0"},
+    {:req, "~> 0.4.5"},
+    :explorer
+  ],
+  consolidate_protocols: false
+)
+```
+
+## Authenticate to Google Cloud
+
+Load credentials.json file, set Google API scopes and use Goth to authenticate to Google Cloud.
+
+```elixir
+credentials = "credentials.json" |> File.read!() |> Jason.decode!()
+
+scopes = [
+  "https://www.googleapis.com/auth/analytics",
+  "https://www.googleapis.com/auth/analytics.edit",
+  "https://www.googleapis.com/auth/analytics.readonly",
+  "https://www.googleapis.com/auth/analytics.manage.users",
+  "https://www.googleapis.com/auth/analytics.manage.users.readonly"
+]
+
+source = {:service_account, credentials, [scopes: scopes]}
+{:ok, _} = Goth.start_link(name: GA, source: source, http_client: &Req.request/1)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+{:ok, #PID<0.3422.0>}
+```
+
+## Use Req GA4 plugin to query Google Analytics
+
+Attach ReqGA to Req's request and response steps:
+
+```elixir
+req = Req.new() |> ReqGA.attach(goth: GA)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Req.Request{
+  method: :get,
+  url: URI.parse(""),
+  headers: %{},
+  body: nil,
+  options: %{goth: GA},
+  registered_options: MapSet.new([:retry_log_level, :max_retries, :redirect_trusted,
+   :redirect_log_level, :decode_body, :compressed, :receive_timeout, :form, :finch, :retry,
+   :redact_auth, :auth, :follow_redirects, :pool_timeout, :finch_private, :goth, :property_id,
+   :decode_json, :location_trusted, :path_params, :http_errors, :cache_dir, :base_url, :redirect,
+   :cache, :inet6, :unix_socket, :compress_body, :user_agent, :max_redirects, :retry_delay, :json,
+   :plug, :output, :raw, :finch_request, :ga, :range, :params, :connect_options]),
+  halted: false,
+  adapter: &Req.Steps.run_finch/1,
+  request_steps: [
+    ga_run: #Function<0.112060180/1 in ReqGA.run>,
+    put_user_agent: &Req.Steps.put_user_agent/1,
+    compressed: &Req.Steps.compressed/1,
+    encode_body: &Req.Steps.encode_body/1,
+    put_base_url: &Req.Steps.put_base_url/1,
+    auth: &Req.Steps.auth/1,
+    put_params: &Req.Steps.put_params/1,
+    put_path_params: &Req.Steps.put_path_params/1,
+    put_range: &Req.Steps.put_range/1,
+    cache: &Req.Steps.cache/1,
+    put_plug: &Req.Steps.put_plug/1,
+    compress_body: &Req.Steps.compress_body/1
+  ],
+  response_steps: [
+    retry: &Req.Steps.retry/1,
+    redirect: &Req.Steps.redirect/1,
+    decompress_body: &Req.Steps.decompress_body/1,
+    decode_body: &Req.Steps.decode_body/1,
+    handle_http_errors: &Req.Steps.handle_http_errors/1,
+    output: &Req.Steps.output/1
+  ],
+  error_steps: [retry: &Req.Steps.retry/1],
+  private: %{}
+}
+```
+
+### Run a report
+
+```elixir
+# ID of property to query. In the format "properties/<id number>"
+property_id = "properties/264264328"
+
+# Define a report to be posted
+report = %{
+  "dateRanges" => [%{"startDate" => "2023-09-01", "endDate" => "2023-09-15"}],
+  "dimensions" => [%{"name" => "country"}],
+  "metrics" => [
+    %{"name" => "activeUsers"},
+    %{"name" => "userEngagementDuration"},
+    %{"name" => "engagementRate"},
+    %{"name" => "organicGoogleSearchClickThroughRate"}
+  ]
+}
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%{
+  "dateRanges" => [%{"endDate" => "2023-09-15", "startDate" => "2023-09-01"}],
+  "dimensions" => [%{"name" => "country"}],
+  "metrics" => [
+    %{"name" => "activeUsers"},
+    %{"name" => "userEngagementDuration"},
+    %{"name" => "engagementRate"},
+    %{"name" => "organicGoogleSearchClickThroughRate"}
+  ]
+}
+```
+
+```elixir
+# Run the report with the :run_report method
+res = Req.post!(req, ga: :run_report, property_id: property_id, json: report)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Req.Response{
+  status: 200,
+  headers: %{
+    "alt-svc" => ["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],
+    "cache-control" => ["private"],
+    "content-type" => ["application/json; charset=UTF-8"],
+    "date" => ["Fri, 17 Nov 2023 13:03:11 GMT"],
+    "server" => ["ESF"],
+    "transfer-encoding" => ["chunked"],
+    "vary" => ["Origin", "X-Origin", "Referer"],
+    "x-content-type-options" => ["nosniff"],
+    "x-frame-options" => ["SAMEORIGIN"],
+    "x-xss-protection" => ["0"]
+  },
+  body: %ReqGA.ReportResponse{
+    dimensions: ["country"],
+    metrics: [
+      {"activeUsers", "TYPE_INTEGER"},
+      {"userEngagementDuration", "TYPE_SECONDS"},
+      {"engagementRate", "TYPE_FLOAT"},
+      {"organicGoogleSearchClickThroughRate", "TYPE_FLOAT"}
+    ],
+    columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate",
+     "organicGoogleSearchClickThroughRate"],
+    rows: [
+      ["Australia", 10089, 568807, 0.6080890737138641, 0.06607765656247402],
+      ["India", 46, 1022, 0.6730769230769231, 0.006472491909385114]
+    ],
+    totals: nil,
+    maximums: nil,
+    minimums: nil,
+    count: 2,
+    property_quota: nil,
+    metadata: %{
+      "currencyCode" => "AUD",
+      "subjectToThresholding" => true,
+      "timeZone" => "Australia/Melbourne"
+    }
+  },
+  trailers: %{},
+  private: %{}
+}
+```
+
+The response body hold the data returned from the Google Analytics API end points:
+
+```elixir
+res.body
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%ReqGA.ReportResponse{
+  dimensions: ["country"],
+  metrics: [
+    {"activeUsers", "TYPE_INTEGER"},
+    {"userEngagementDuration", "TYPE_SECONDS"},
+    {"engagementRate", "TYPE_FLOAT"},
+    {"organicGoogleSearchClickThroughRate", "TYPE_FLOAT"}
+  ],
+  columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate",
+   "organicGoogleSearchClickThroughRate"],
+  rows: [
+    ["Australia", 10089, 568807, 0.6080890737138641, 0.06607765656247402],
+    ["India", 46, 1022, 0.6730769230769231, 0.006472491909385114]
+  ],
+  totals: nil,
+  maximums: nil,
+  minimums: nil,
+  count: 2,
+  property_quota: nil,
+  metadata: %{
+    "currencyCode" => "AUD",
+    "subjectToThresholding" => true,
+    "timeZone" => "Australia/Melbourne"
+  }
+}
+```
+
+The `%ReqGA.ReportResponse{}` implements the `Table.Response` protocol, which means it can be piped into `Kino.DataTable.new()`, `Explorer.DataFrame.new()` and other functions which implement it.
+
+```elixir
+res.body
+|> Kino.DataTable.new()
+```
+
+<!-- livebook:{"output":true} -->
+
+```text
+%ReqGA.ReportResponse{dimensions: ["country"], metrics: [{"activeUsers", "TYPE_INTEGER"}, {"userEngagementDuration", "TYPE_SECONDS"}, {"engagementRate", "TYPE_FLOAT"}, {"organicGoogleSearchClickThroughRate", "TYPE_FLOAT"}], columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate", "organicGoogleSearchClickThroughRate"], rows: [["Australia", 10089, 568807, 0.6080890737138641, 0.06607765656247402], ["India", 46, 1022, 0.6730769230769231, 0.006472491909385114]], totals: nil, maximums: nil, minimums: nil, count: 2, property_quota: nil, metadata: %{"currencyCode" => "AUD", "subjectToThresholding" => true, "timeZone" => "Australia/Melbourne"}}
+```
+
+```elixir
+res.body
+|> Explorer.DataFrame.new()
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+#Explorer.DataFrame<
+  Polars[2 x 5]
+  country string ["Australia", "India"]
+  activeUsers integer [10089, 46]
+  userEngagementDuration integer [568807, 1022]
+  engagementRate float [0.6080890737138641, 0.6730769230769231]
+  organicGoogleSearchClickThroughRate float [0.06607765656247402, 0.006472491909385114]
+>
+```
+
+## Get metadata for a property
+
+Metadata allows you to gather dimensions and metrics (including custom dimensions and metrics) for the property.
+
+```elixir
+# List the custom dimensions added to a property
+Req.get!(req, ga: :metadata, property_id: property_id).body["dimensions"]
+|> Enum.filter(fn dimension -> String.starts_with?(dimension["apiName"], "customEvent") end)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+[
+  %{
+    "apiName" => "customEvent:accordion_on_page",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Accordion on page"
+  },
+  %{
+    "apiName" => "customEvent:content_avg_read_time",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Content avg read time"
+  },
+  %{
+    "apiName" => "customEvent:content_breadcrumb_path_lvl_1",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Breadcrumb Level 1"
+  },
+  %{
+    "apiName" => "customEvent:content_breadcrumb_path_lvl_2",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Breadcrumb Level 2"
+  },
+  %{
+    "apiName" => "customEvent:content_breadcrumb_path_lvl_3",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Breadcrumb Level 3"
+  },
+  %{
+    "apiName" => "customEvent:content_breadcrumb_path_lvl_4",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Breadcrumb Level 4"
+  },
+  %{
+    "apiName" => "customEvent:content_breadcrumb_path_lvl_5",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Breadcrumb Level 5"
+  },
+  %{
+    "apiName" => "customEvent:content_publication_name",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Content publication name"
+  },
+  %{
+    "apiName" => "customEvent:content_section_count",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Content site section count"
+  },
+  %{
+    "apiName" => "customEvent:content_site_section",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Content site section"
+  },
+  %{
+    "apiName" => "customEvent:content_type",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Content type"
+  },
+  %{
+    "apiName" => "customEvent:content_wordcount_range",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Content word count range"
+  },
+  %{
+    "apiName" => "customEvent:department",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Department"
+  },
+  %{
+    "apiName" => "customEvent:error_message",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Error Message"
+  },
+  %{
+    "apiName" => "customEvent:event_data",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Event Data"
+  },
+  %{
+    "apiName" => "customEvent:event_timestamp",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "AUTO Event Timestamp"
+  },
+  %{
+    "apiName" => "customEvent:file_download_on_page",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "File on Page"
+  },
+  %{
+    "apiName" => "customEvent:file_extension",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "File Extension"
+  },
+  %{
+    "apiName" => "customEvent:file_name",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "File Name"
+  },
+  %{
+    "apiName" => "customEvent:file_size",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "File Size"
+  },
+  %{
+    "apiName" => "customEvent:form_name",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Form name"
+  },
+  %{
+    "apiName" => "customEvent:ga_session_id",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "AUTO GA Session ID"
+  },
+  %{
+    "apiName" => "customEvent:gtm_container_id",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "GTM container ID"
+  },
+  %{
+    "apiName" => "customEvent:gtm_container_version",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "GTM container version"
+  },
+  %{
+    "apiName" => "customEvent:image_count",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Image Count"
+  },
+  %{
+    "apiName" => "customEvent:image_on_page",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Image on Page"
+  },
+  %{
+    "apiName" => "customEvent:link_classes",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Link Classes"
+  },
+  %{
+    "apiName" => "customEvent:link_text",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Link Text"
+  },
+  %{
+    "apiName" => "customEvent:link_url",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Link URL"
+  },
+  %{
+    "apiName" => "customEvent:outbound",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Link Outbound"
+  },
+  %{
+    "apiName" => "customEvent:page_location",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Page Location"
+  },
+  %{
+    "apiName" => "customEvent:percent_scrolled",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Percent Scrolled"
+  },
+  %{
+    "apiName" => "customEvent:search_term",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Search Term"
+  },
+  %{
+    "apiName" => "customEvent:traffic_type",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Traffic type"
+  },
+  %{
+    "apiName" => "customEvent:url_query",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "URL Query"
+  },
+  %{
+    "apiName" => "customEvent:video_on_page",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Video on Page"
+  },
+  %{
+    "apiName" => "customEvent:video_title",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Video Title"
+  },
+  %{
+    "apiName" => "customEvent:video_url",
+    "category" => "Event-scoped Custom Dimension",
+    "customDefinition" => true,
+    "description" => "An event scoped custom dimension for your Analytics property.",
+    "uiName" => "Video URL"
+  }
+]
+```
+
+## Get custom dimension and metrics for a property
+
+The Admin API also allows you to query, add or update dimensions and metrics for a property.
+
+Lets query it now:
+
+```elixir
+# Enter an ID of a GA4 property in the following format:
+property_id = "properties/264264328"
+
+res = Req.get!(req, ga: :custom_dimensions, property_id: property_id)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Req.Response{
+  status: 200,
+  headers: %{
+    "alt-svc" => ["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],
+    "cache-control" => ["private"],
+    "content-type" => ["application/json; charset=UTF-8"],
+    "date" => ["Fri, 17 Nov 2023 13:18:51 GMT"],
+    "server" => ["ESF"],
+    "transfer-encoding" => ["chunked"],
+    "vary" => ["Origin", "X-Origin", "Referer"],
+    "x-content-type-options" => ["nosniff"],
+    "x-frame-options" => ["SAMEORIGIN"],
+    "x-xss-protection" => ["0"]
+  },
+  body: [
+    %{
+      "description" => "This may not show up in GA4, only in BQ",
+      "displayName" => "AUTO Event Timestamp",
+      "parameterName" => "event_timestamp",
+      "scope" => "EVENT"
+    },
+    %{"displayName" => "AUTO GA Session ID", "parameterName" => "ga_session_id", "scope" => "EVENT"},
+    %{
+      "description" => "This may not show up in GA4, only in BQ",
+      "displayName" => "AUTO User Pseudo ID",
+      "parameterName" => "user_pseudo_id",
+      "scope" => "USER"
+    },
+    %{
+      "description" => "Yes/No Accordion on page",
+      "displayName" => "Accordion on page",
+      "parameterName" => "accordion_on_page",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "Breadcrumb Level 1",
+      "parameterName" => "content_breadcrumb_path_lvl_1",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "Breadcrumb Level 2",
+      "parameterName" => "content_breadcrumb_path_lvl_2",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "Breadcrumb Level 3",
+      "parameterName" => "content_breadcrumb_path_lvl_3",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "Breadcrumb Level 4",
+      "parameterName" => "content_breadcrumb_path_lvl_4",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "Breadcrumb Level 5",
+      "parameterName" => "content_breadcrumb_path_lvl_5",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "Content avg read time",
+      "parameterName" => "content_avg_read_time",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "Content publication name",
+      "parameterName" => "content_publication_name",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "Content site section",
+      "parameterName" => "content_site_section",
+      "scope" => "EVENT"
+    },
+    %{
+      "description" => "Count of H2 headings for section count",
+      "displayName" => "Content site section count",
+      "parameterName" => "content_section_count",
+      "scope" => "EVENT"
+    },
+    %{"displayName" => "Content type", "parameterName" => "content_type", "scope" => "EVENT"},
+    %{
+      "displayName" => "Content word count range",
+      "parameterName" => "content_wordcount_range",
+      "scope" => "EVENT"
+    },
+    %{"displayName" => "Department", "parameterName" => "department", "scope" => "EVENT"},
+    %{"displayName" => "Error Message", "parameterName" => "error_message", "scope" => "EVENT"},
+    %{"displayName" => "Event Data", "parameterName" => "event_data", "scope" => "EVENT"},
+    %{"displayName" => "File Extension", "parameterName" => "file_extension", "scope" => "EVENT"},
+    %{"displayName" => "File Name", "parameterName" => "file_name", "scope" => "EVENT"},
+    %{"displayName" => "File Size", "parameterName" => "file_size", "scope" => "EVENT"},
+    %{
+      "description" => "Yes/No if there is one or more files to download on the page.",
+      "displayName" => "File on Page",
+      "parameterName" => "file_download_on_page",
+      "scope" => "EVENT"
+    },
+    %{
+      "description" => "Name of a form",
+      "displayName" => "Form name",
+      "parameterName" => "form_name",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "GTM container ID",
+      "parameterName" => "gtm_container_id",
+      "scope" => "EVENT"
+    },
+    %{
+      "displayName" => "GTM container version",
+      "parameterName" => "gtm_container_version",
+      "scope" => "EVENT"
+    },
+    %{
+      "description" => "Count of images on page",
+      "displayName" => "Image Count",
+      "parameterName" => "image_count",
+      "scope" => "EVENT"
+    },
+    %{
+      "description" => "Yes/No for the presence of one or more images on a page",
+      "displayName" => "Image on Page",
+      "parameterName" => "image_on_page",
+      "scope" => "EVENT"
+    },
+    %{"displayName" => "Link Classes", "parameterName" => "link_classes", "scope" => "EVENT"},
+    %{
+      "description" => "True/False; True if the link click is external to the website. False if an internal link click.",
+      "displayName" => "Link Outbound",
+      "parameterName" => "outbound",
+      "scope" => "EVENT"
+    },
+    %{"displayName" => "Link Text", "parameterName" => "link_text", "scope" => "EVENT"},
+    %{"displayName" => "Link URL", "parameterName" => "link_url", "scope" => "EVENT"},
+    %{"displayName" => "Page Location", "parameterName" => "page_location", "scope" => "EVENT"},
+    %{
+      "description" => "The scroll depth threshold represented as a %",
+      "displayName" => "Percent Scrolled",
+      "parameterName" => "percent_scrolled",
+      "scope" => "EVENT"
+    },
+    %{"displayName" => "Search Term", "parameterName" => "search_term", "scope" => "EVENT"},
+    %{
+      "description" => "When traffic_type = internal this means the visitor is on a VPS IP range.",
+      "displayName" => "Traffic type",
+      "parameterName" => "traffic_type",
+      "scope" => "EVENT"
+    },
+    %{"displayName" => "URL Query", "parameterName" => "url_query", "scope" => "EVENT"},
+    %{"displayName" => "Video Title", "parameterName" => "video_title", "scope" => "EVENT"},
+    %{"displayName" => "Video URL", "parameterName" => "video_url", "scope" => "EVENT"},
+    %{
+      "description" => "Yes/No if there is a video embedded on the page.",
+      "displayName" => "Video on Page",
+      "parameterName" => "video_on_page",
+      "scope" => "EVENT"
+    }
+  ],
+  trailers: %{},
+  private: %{}
+}
+```
+
+Although it brings back a list of maps, it can be piped into a Kino DataTable or Explorer DataFrame if they have the same keys.
+
+In this example only some dimensions have descriptions, so we'll drop these first before piping into Kino DataTable
+
+```elixir
+res.body |> Enum.map(&Map.drop(&1, ["description"])) |> Kino.DataTable.new()
+```
+
+<!-- livebook:{"output":true} -->
+
+```text
+[%{"displayName" => "AUTO Event Timestamp", "parameterName" => "event_timestamp", "scope" => "EVENT"}, %{"displayName" => "AUTO GA Session ID", "parameterName" => "ga_session_id", "scope" => "EVENT"}, %{"displayName" => "AUTO User Pseudo ID", "parameterName" => "user_pseudo_id", "scope" => "USER"}, %{"displayName" => "Accordion on page", "parameterName" => "accordion_on_page", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 1", "parameterName" => "content_breadcrumb_path_lvl_1", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 2", "parameterName" => "content_breadcrumb_path_lvl_2", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 3", "parameterName" => "content_breadcrumb_path_lvl_3", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 4", "parameterName" => "content_breadcrumb_path_lvl_4", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 5", "parameterName" => "content_breadcrumb_path_lvl_5", "scope" => "EVENT"}, %{"displayName" => "Content avg read time", "parameterName" => "content_avg_read_time", "scope" => "EVENT"}, %{"displayName" => "Content publication name", "parameterName" => "content_publication_name", "scope" => "EVENT"}, %{"displayName" => "Content site section", "parameterName" => "content_site_section", "scope" => "EVENT"}, %{"displayName" => "Content site section count", "parameterName" => "content_section_count", "scope" => "EVENT"}, %{"displayName" => "Content type", "parameterName" => "content_type", "scope" => "EVENT"}, %{"displayName" => "Content word count range", "parameterName" => "content_wordcount_range", "scope" => "EVENT"}, %{"displayName" => "Department", "parameterName" => "department", "scope" => "EVENT"}, %{"displayName" => "Error Message", "parameterName" => "error_message", "scope" => "EVENT"}, %{"displayName" => "Event Data", "parameterName" => "event_data", "scope" => "EVENT"}, %{"displayName" => "File Extension", "parameterName" => "file_extension", "scope" => "EVENT"}, %{"displayName" => "File Name", "parameterName" => "file_name", "scope" => "EVENT"}, %{"displayName" => "File Size", "parameterName" => "file_size", "scope" => "EVENT"}, %{"displayName" => "File on Page", "parameterName" => "file_download_on_page", "scope" => "EVENT"}, %{"displayName" => "Form name", "parameterName" => "form_name", "scope" => "EVENT"}, %{"displayName" => "GTM container ID", "parameterName" => "gtm_container_id", "scope" => "EVENT"}, %{"displayName" => "GTM container version", "parameterName" => "gtm_container_version", "scope" => "EVENT"}, %{"displayName" => "Image Count", "parameterName" => "image_count", "scope" => "EVENT"}, %{"displayName" => "Image on Page", "parameterName" => "image_on_page", "scope" => "EVENT"}, %{"displayName" => "Link Classes", "parameterName" => "link_classes", "scope" => "EVENT"}, %{"displayName" => "Link Outbound", "parameterName" => "outbound", "scope" => "EVENT"}, %{"displayName" => "Link Text", "parameterName" => "link_text", "scope" => "EVENT"}, %{"displayName" => "Link URL", "parameterName" => "link_url", "scope" => "EVENT"}, %{"displayName" => "Page Location", "parameterName" => "page_location", "scope" => "EVENT"}, %{"displayName" => "Percent Scrolled", "parameterName" => "percent_scrolled", "scope" => "EVENT"}, %{"displayName" => "Search Term", "parameterName" => "search_term", "scope" => "EVENT"}, %{"displayName" => "Traffic type", "parameterName" => "traffic_type", "scope" => "EVENT"}, %{"displayName" => "URL Query", "parameterName" => "url_query", "scope" => "EVENT"}, %{"displayName" => "Video Title", "parameterName" => "video_title", "scope" => "EVENT"}, %{"displayName" => "Video URL", "parameterName" => "video_url", "scope" => "EVENT"}, %{"displayName" => "Video on Page", "parameterName" => "video_on_page", "scope" => "EVENT"}]
+```
+
+## Account summaries
+
+This uses the Google Analytics Admin API and requires one of the following OAuth scopes:
+
+* https://www.googleapis.com/auth/analytics.readonly
+* https://www.googleapis.com/auth/analytics.edit
+
+```elixir
+res = Req.get!(req, ga: :account_summaries)
+```
+
+<!-- livebook:{"output":true} -->
+
+```
+%Req.Response{
+  status: 200,
+  headers: %{
+    "alt-svc" => ["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],
+    "cache-control" => ["private"],
+    "content-type" => ["application/json; charset=UTF-8"],
+    "date" => ["Fri, 17 Nov 2023 13:14:21 GMT"],
+    "server" => ["ESF"],
+    "transfer-encoding" => ["chunked"],
+    "vary" => ["Origin", "X-Origin", "Referer"],
+    "x-content-type-options" => ["nosniff"],
+    "x-frame-options" => ["SAMEORIGIN"],
+    "x-xss-protection" => ["0"]
+  },
+  body: %ReqGA.AccountList{
+    accounts: [
+      %ReqGA.Account{
+        account: "accounts/120824569",
+        display_name: "Single Digital Presence",
+        resource_name: "accountSummaries/120824569",
+        create_time: nil,
+        update_time: nil,
+        region_code: nil,
+        property_summaries: [
+          %ReqGA.Property{
+            display_name: "vic.gov.au - GA4 - Production",
+            parent: "accounts/120824569",
+            property: "properties/271967934",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          }
+        ]
+      },
+      %ReqGA.Account{
+        account: "accounts/123138994",
+        display_name: "Respect Victoria",
+        resource_name: "accountSummaries/123138994",
+        create_time: nil,
+        update_time: nil,
+        region_code: nil,
+        property_summaries: [
+          %ReqGA.Property{
+            display_name: "Respect Victoria website - GA4 - Production",
+            parent: "accounts/123138994",
+            property: "properties/277768283",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "Respect Victoria website - GA4 - Test",
+            parent: "accounts/123138994",
+            property: "properties/359044799",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          }
+        ]
+      },
+      %ReqGA.Account{
+        account: "accounts/191178671",
+        display_name: "Department of Families, Fairness and Housing (DFFH)",
+        resource_name: "accountSummaries/191178671",
+        create_time: nil,
+        update_time: nil,
+        region_code: nil,
+        property_summaries: [
+          %ReqGA.Property{
+            display_name: "companioncard.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/253225376",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "companioncard.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/253287074",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "dffh.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/264264328",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "dhhsvicgovau.sharepoint.com/sites/dffh - Intranet - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/276715261",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "dffh.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/290990089",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "z SharePoint intranet pilot - test account - GA4",
+            parent: "accounts/191178671",
+            property: "properties/296086310",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "z DFFH Sharepoint intranet pilot - GTM version - GA4",
+            parent: "accounts/191178671",
+            property: "properties/297102856",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "homes.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/313446113",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "homes.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/313494610",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "seniorsonline.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/313867034",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "seniorsonline.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/315865797",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "menu.dffh.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/329227591",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "menu.dffh.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/329259500",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "cims.dffh.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/355423695",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "insureit.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/364722088",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "z - BROKEN - cpmanual.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/365353477",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "volunteer.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/367444492",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "cpmanual.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/376055720",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "fac.dffh.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/376058287",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "childprotectionjobs.dffh.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/376062022",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "youthcentral.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/376068224",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "fac.dffh.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/376069673",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "housing.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/376074835",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "youthcentral.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/376079344",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "providers.dffh.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/376080928",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            ...
+          },
+          %ReqGA.Property{
+            display_name: "orangedoor.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/376081978",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            ...
+          },
+          %ReqGA.Property{
+            display_name: "services.dffh.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/376082224",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            ...
+          },
+          %ReqGA.Property{
+            display_name: "volunteer.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/376082457",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            ...
+          },
+          %ReqGA.Property{
+            display_name: "housing.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/376083249",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            ...
+          },
+          %ReqGA.Property{
+            display_name: "optionsfinder.housing.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/376084602",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            ...
+          },
+          %ReqGA.Property{
+            display_name: "services.dffh.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/376084603",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            ...
+          },
+          %ReqGA.Property{
+            display_name: "providers.dffh.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            property: "properties/376084689",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            ...
+          },
+          %ReqGA.Property{
+            display_name: "findingrecords.dhhs.vic.gov.au - GA4 - Production",
+            parent: "accounts/191178671",
+            property: "properties/376087542",
+            ...
+          },
+          %ReqGA.Property{
+            display_name: "findingrecords.dhhs.vic.gov.au - GA4 - Test",
+            parent: "accounts/191178671",
+            ...
+          },
+          %ReqGA.Property{display_name: "carercard.vic.gov.au - GA4 - Production", ...},
+          %ReqGA.Property{...},
+          ...
+        ]
+      },
+      %ReqGA.Account{
+        account: "accounts/57740820",
+        display_name: "0011 - DHHS",
+        resource_name: "accountSummaries/57740820",
+        create_time: nil,
+        update_time: nil,
+        region_code: nil,
+        property_summaries: [
+          %ReqGA.Property{
+            display_name: "Department of Health and Human Services website",
+            parent: "accounts/57740820",
+            property: "properties/227145498",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "coronavirus.dhhs.vic.gov.au",
+            parent: "accounts/57740820",
+            property: "properties/231413518",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "mhrv.vic.gov.au - Test - GA4",
+            parent: "accounts/57740820",
+            property: "properties/253266562",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "mhrv.vic.gov.au - Production - GA4",
+            parent: "accounts/57740820",
+            property: "properties/253285161",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "busreg.covid19.dhhs.vic.gov.au - GA4",
+            parent: "accounts/57740820",
+            property: "properties/256527564",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "abetterme.vic - GA4",
+            parent: "accounts/57740820",
+            property: "properties/340430531",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          },
+          %ReqGA.Property{
+            display_name: "DHHS GTM Test - GA4",
+            parent: "accounts/57740820",
+            property: "properties/383636094",
+            property_type: "PROPERTY_TYPE_ORDINARY",
+            resource_name: nil,
+            create_time: nil,
+            update_time: nil,
+            industry_category: nil,
+            time_zone: nil,
+            currency_code: nil,
+            service_level: nil,
+            account: nil
+          }
+        ]
+      }
+    ],
+    count: 4
+  },
+  trailers: %{},
+  private: %{}
+}
+```
+
+```elixir
+res.body |> Kino.DataTable.new()
+```
+
+<!-- livebook:{"output":true} -->
+
+```text
+%ReqGA.AccountList{accounts: [%ReqGA.Account{account: "accounts/120824569", display_name: "Single Digital Presence", resource_name: "accountSummaries/120824569", create_time: nil, update_time: nil, region_code: nil, property_summaries: [%ReqGA.Property{display_name: "vic.gov.au - GA4 - Production", parent: "accounts/120824569", property: "properties/271967934", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}]}, %ReqGA.Account{account: "accounts/123138994", display_name: "Respect Victoria", resource_name: "accountSummaries/123138994", create_time: nil, update_time: nil, region_code: nil, property_summaries: [%ReqGA.Property{display_name: "Respect Victoria website - GA4 - Production", parent: "accounts/123138994", property: "properties/277768283", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "Respect Victoria website - GA4 - Test", parent: "accounts/123138994", property: "properties/359044799", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}]}, %ReqGA.Account{account: "accounts/191178671", display_name: "Department of Families, Fairness and Housing (DFFH)", resource_name: "accountSummaries/191178671", create_time: nil, update_time: nil, region_code: nil, property_summaries: [%ReqGA.Property{display_name: "companioncard.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/253225376", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "companioncard.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/253287074", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "dffh.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/264264328", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "dhhsvicgovau.sharepoint.com/sites/dffh - Intranet - GA4 - Production", parent: "accounts/191178671", property: "properties/276715261", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "dffh.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/290990089", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "z SharePoint intranet pilot - test account - GA4", parent: "accounts/191178671", property: "properties/296086310", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "z DFFH Sharepoint intranet pilot - GTM version - GA4", parent: "accounts/191178671", property: "properties/297102856", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "homes.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/313446113", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "homes.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/313494610", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "seniorsonline.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/313867034", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "seniorsonline.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/315865797", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "menu.dffh.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/329227591", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "menu.dffh.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/329259500", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "cims.dffh.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/355423695", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "insureit.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/364722088", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "z - BROKEN - cpmanual.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/365353477", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "volunteer.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/367444492", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "cpmanual.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/376055720", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "fac.dffh.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376058287", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "childprotectionjobs.dffh.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376062022", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "youthcentral.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/376068224", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "fac.dffh.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/376069673", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "housing.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/376074835", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "youthcentral.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376079344", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "providers.dffh.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376080928", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "orangedoor.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376081978", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "services.dffh.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/376082224", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "volunteer.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/376082457", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, ...}, %ReqGA.Property{display_name: "housing.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376083249", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, ...}, %ReqGA.Property{display_name: "optionsfinder.housing.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376084602", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, ...}, %ReqGA.Property{display_name: "services.dffh.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376084603", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, ...}, %ReqGA.Property{display_name: "providers.dffh.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/376084689", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, ...}, %ReqGA.Property{display_name: "findingrecords.dhhs.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376087542", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, ...}, %ReqGA.Property{display_name: "findingrecords.dhhs.vic.gov.au - GA4 - Test", parent: "accounts/191178671", property: "properties/376088420", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, ...}, %ReqGA.Property{display_name: "carercard.vic.gov.au - GA4 - Production", parent: "accounts/191178671", property: "properties/376089536", property_type: "PROPERTY_TYPE_ORDINARY", ...}, %ReqGA.Property{display_name: "z NOT used - GAC - GA4 - Test", parent: "accounts/191178671", property: "properties/376090094", ...}, %ReqGA.Property{display_name: "cpmanual.vic.gov.au - GA4 - Production - V2", parent: "accounts/191178671", ...}, %ReqGA.Property{display_name: "z NOT USED - VVC - GA4 - Test", ...}, %ReqGA.Property{...}, ...]}, %ReqGA.Account{account: "accounts/57740820", display_name: "0011 - DHHS", resource_name: "accountSummaries/57740820", create_time: nil, update_time: nil, region_code: nil, property_summaries: [%ReqGA.Property{display_name: "Department of Health and Human Services website", parent: "accounts/57740820", property: "properties/227145498", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "coronavirus.dhhs.vic.gov.au", parent: "accounts/57740820", property: "properties/231413518", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "mhrv.vic.gov.au - Test - GA4", parent: "accounts/57740820", property: "properties/253266562", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "mhrv.vic.gov.au - Production - GA4", parent: "accounts/57740820", property: "properties/253285161", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "busreg.covid19.dhhs.vic.gov.au - GA4", parent: "accounts/57740820", property: "properties/256527564", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "abetterme.vic - GA4", parent: "accounts/57740820", property: "properties/340430531", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}, %ReqGA.Property{display_name: "DHHS GTM Test - GA4", parent: "accounts/57740820", property: "properties/383636094", property_type: "PROPERTY_TYPE_ORDINARY", resource_name: nil, create_time: nil, update_time: nil, industry_category: nil, time_zone: nil, currency_code: nil, service_level: nil, account: nil}]}], count: 4}
+```
+
+<!-- livebook:{"offset":66298,"stamp":{"token":"XCP._SmtZwoDT6yQY0SsQoTgX4bnHy1JT1NXFa9yvSad2bi983v3D_by3VhtYDuo679JHV24JxD7MYKsMiYEGutZR4MaY0g40eDyjKyAtg","version":2}} -->
