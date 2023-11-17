@@ -38,7 +38,7 @@ This makes it easier to view in LiveBook as a table by piping it to [`Kino.DataT
 
 
 ## Related packages
-You may also be interested with the [ReqBigQuery](https://hex.pm/packages/req_bigquery) which is a Req plugin for [BigQuery](https://cloud.google.com/bigquery).
+You may also be interested in the [ReqBigQuery](https://hex.pm/packages/req_bigquery) which is a Req plugin for [BigQuery](https://cloud.google.com/bigquery).
 
 ## Example
 ```
