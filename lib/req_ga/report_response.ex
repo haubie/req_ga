@@ -11,7 +11,7 @@ defmodule ReqGA.ReportResponse do
       dimensions: dimensions,
       metrics: metrics,
       columns: columns,
-      rows: parse_rows(body["rows"], metrics),
+      rows: if(body["rows"], do: parse_rows(body["rows"], metrics), else: nil),
       totals: body["totals"],
       maximums: body["maximums"],
       minimums: body["minimums"],
@@ -19,6 +19,7 @@ defmodule ReqGA.ReportResponse do
       metadata: body["metadata"],
       property_quota: body["propertyQuota"]
     }
+
   end
 
   defp parse_dimensions(dimensions) do

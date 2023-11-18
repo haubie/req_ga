@@ -5,15 +5,106 @@
 ```elixir
 Mix.install(
   [
-    {:req_ga, path: "../req_ga"},
+    {:req_ga, "~> 0.1.0"},
     {:kino_db, "~> 0.2.1"},
     {:goth, "~> 1.3.0"},
     {:req, "~> 0.4.5"},
-    :explorer
-  ],
-  consolidate_protocols: false
+    :explorer,
+    {:kino_vega_lite, "~> 0.1.10"}
+  ]
 )
 ```
+
+## Introduction
+
+### Context
+
+Since the retirement of the previous version of Google Analytics (known as Universal Analytics), Google is [actively developing APIs](https://developers.google.com/analytics) for it's replacement, [Google Analytics 4](https://developers.google.com/analytics/devguides/collection/ga4) (abbreviated to GA4 in this notebook).
+
+As of 2023, most of these APIs are in either *alpha* or *beta* releases and are subject to refinement.
+
+### GA4 APIs
+
+There are a number of APIs for interacting with GA4:
+
+* [**Data API**](https://developers.google.com/analytics/devguides/reporting/data): used to generate GA4 report data
+* [**Admin API**](https://developers.google.com/analytics/devguides/config/admin): used to access, create and modify GA4 configuration data
+* [**User Deletion API**](https://developers.google.com/analytics/devguides/config/userdeletion/): use to delete data for a given user from a project or web property (e.g. for safeguarding data or for privacy reasons).
+
+### Req and ReqGA
+
+[Req](https://github.com/wojtekmach/req) is an innovative and flexible HTTP client by [Wojtek Mach](https://github.com/wojtekmach). It's flexibility is due to the request and response cycle being chunked into a series of steps which can be re-used, re-arranged or even added to.
+
+The ReqGA plugin library does this, adding additional steps to make it easier interacting with GA4 HTTP API endpoints as well as decoding the data returned so it is easier to work with from Elixir.
+
+Many of the ReqGA's structs implement the [`Table.Reader`](https://hex.pm/packages/table) protocol which makes it play nicely with other `Table.Reader` compatible libraries and tools, such as [Livebook](https://livebook.dev/), various [Kino](https://github.com/livebook-dev/kino) widgets and the DataFrame library [Explorer](https://github.com/elixir-explorer/explorer).
+
+### Uses of ReqGA
+
+The uses of ReqGA are only limited by what the GA4 APIs allow and your imagination! Some example uses may be:
+
+* Exploratory data analysis within Livebook using Explorer and Kino
+* Custom Phoenix LiveView reporting dashboards
+* Automating batch reports, for example, emailing out a monthly report
+* Reacting to realtime GA4 events
+* Implementing custom data pipelines using GA4 data, such as an ETL or data value-adding workload
+* Simplifying or automating administration tasks, such as bulk configuration of custom dimensions and metrics, etc.
+
+### What APIs methods been implemented - *so far!*
+
+The table below summarises what GA4 API endpoints have been implemented so far:
+
+| :ga API method            | API       | Endpoint                  | Req HTTP method supported |
+| ------------------------- | --------- | ------------------------- | ------------------------- |
+| :run_report               | Data API  | ":runReport"              | post                      |
+| :batch_run_reports        | Data API  | ":batchRunReports"        | post                      |
+| :run_pivot_report         | Data API  | ":runPivotReport"         | post                      |
+| :batch_run_pivot_reports  | Data API  | ":batchRunPivotReports"   | post                      |
+| :run_realtime_report      | Data API  | ":runRealtimeReport"      | post                      |
+| :check_compatibility      | Data API  | ":checkCompatibility"     | post                      |
+| :metadata                 | Data API  | "/metadata"               | get                       |
+| :account_summaries        | Admin API | "/accountSummaries"       | get                       |
+| :custom_dimensions        | Admin API | "/customDimensions"       | get, post                 |
+| :custom_metrics           | Admin API | "/customMetrics"          | get, post                 |
+
+Some endpoints are are quite simple and you'll use `Req.get` or `Req.get!` with the required parameters. Others will require a json payload where you'll use `Req.post` or `Req.post!`.
+
+If in doubt, refer to the Google's official API documentation for more information on which to use. Google's documentation also includes the structure of the payload and expected values.
+
+#### Example code snippet
+
+Assuming [Goth](https://hex.pm/packages/goth) has been started (used to authenticate to Google Cloud), and the ReqGA library has been attached to Req, e.g.:
+
+```
+iex> req = Req.new() |> ReqGA.attach(goth: GA)
+```
+
+You can get a list of the custom dimensions for a GA4 property as follows:
+
+```
+iex> property_id = "properties/264264328"
+iex> res = Req.get!(req, ga: :custom_dimensions, property_id: property_id)
+iex> res.body # the body contains the data returned from the GA4 API.
+```
+
+### General steps
+
+The steps when using this library are:
+
+1. **Authenticate to Google Cloud with Goth.** This will likely require a [service account](https://developers.google.com/analytics/devguides/reporting/data/v1/quickstart-client-libraries) created in the Google Cloud Console, and adding it into the Google Analytics Account(s) or Properties you wish to interact with.
+   Different API calls require different levels of permissions, set though authorisation scopes.
+2. **Attach ReqGA to Req**. The active Goth process is attached at this point.
+3. **Interact the APIs via Req**. The attached ReqGA is passed to Req with each `Req.get!` or `Req.post!` call, ensuring as an ergonmic as experience as possible. An atom representing the API call you wish to make is passed using the `ga:` parameter, e.g. `Req.get!(req, ga: :account_summaries).body` which is equivalent of calling the "/accountSummaries" endpoint on the GA4 Admin API.
+4. **The data is in Req's response**. If sucessfull the `:body` of Req's response will have the result of your call.
+
+*That's it!*
+
+### Get ready...
+
+The examples below will take you though these steps, starting with authenticaing to Google Cloud with Goth. For these examples to function you will need to have:
+
+* your service account setup with the service's account `credentials.json` file added to Livebooks file's section (see the file icon to the left of this page).
+* one or more valid GA4 property IDs so you can interact with the property.
 
 ## Authenticate to Google Cloud
 
@@ -37,7 +128,7 @@ source = {:service_account, credentials, [scopes: scopes]}
 <!-- livebook:{"output":true} -->
 
 ```
-{:ok, #PID<0.3422.0>}
+{:ok, #PID<0.325.0>}
 ```
 
 ## Use Req GA4 plugin to query Google Analytics
@@ -57,12 +148,12 @@ req = Req.new() |> ReqGA.attach(goth: GA)
   headers: %{},
   body: nil,
   options: %{goth: GA},
-  registered_options: MapSet.new([:retry_log_level, :max_retries, :redirect_trusted,
-   :redirect_log_level, :decode_body, :compressed, :receive_timeout, :form, :finch, :retry,
-   :redact_auth, :auth, :follow_redirects, :pool_timeout, :finch_private, :goth, :property_id,
-   :decode_json, :location_trusted, :path_params, :http_errors, :cache_dir, :base_url, :redirect,
-   :cache, :inet6, :unix_socket, :compress_body, :user_agent, :max_redirects, :retry_delay, :json,
-   :plug, :output, :raw, :finch_request, :ga, :range, :params, :connect_options]),
+  registered_options: MapSet.new([:compress_body, :decode_json, :max_retries, :redirect_log_level,
+   :compressed, :max_redirects, :property_id, :base_url, :pool_timeout, :retry_log_level, :retry,
+   :receive_timeout, :range, :user_agent, :location_trusted, :auth, :redact_auth, :unix_socket,
+   :retry_delay, :goth, :json, :cache_dir, :finch, :redirect, :follow_redirects, :decode_body,
+   :redirect_trusted, :cache, :inet6, :finch_private, :path_params, :output, :finch_request, :raw,
+   :ga, :http_errors, :plug, :params, :form, :connect_options]),
   halted: false,
   adapter: &Req.Steps.run_finch/1,
   request_steps: [
@@ -94,13 +185,51 @@ req = Req.new() |> ReqGA.attach(goth: GA)
 
 ### Run a report
 
+<!-- livebook:{"break_markdown":true} -->
+
+Below is an example of a simple report. For each **country** it asks for the number of:
+
+* active users
+* user engagement duration (in seconds)
+* engagement rate (a float representing the percentage); and the
+* organic Google Search click-through rate (also a float). 
+  It does this for the date range **"2023-09-01" to "2023-09-30"**.
+
+Feel free to:
+
+* adjust the date range it isn't valid for your GA4 property
+* change the `property_id` to the ID of a propery you have access to.
+
+#### A note on property IDs
+
+Property IDs are in the format `"properties/<id number>"`, for example:
+
+```
+iex> property_id = "properties/264264328"
+```
+
+When this library looks for a property ID, make sure the `"properties/"` is prepended to the number as above.
+
+#### A note on json payloads
+
+Note that some of the GA4 APIs require you to post a json payload with the actions and data required for that endpoint. `:run_report` is one of those.
+
+Because Req automatically converts Elixir types into a valid json payload, you can write your report request using Elixir datatypes as below.
+
+#### Scopes
+
+`:run_report` requires one of the following OAuth scopes:
+
+* https://www.googleapis.com/auth/analytics.readonly
+* https://www.googleapis.com/auth/analytics
+
 ```elixir
 # ID of property to query. In the format "properties/<id number>"
 property_id = "properties/264264328"
 
 # Define a report to be posted
 report = %{
-  "dateRanges" => [%{"startDate" => "2023-09-01", "endDate" => "2023-09-15"}],
+  "dateRanges" => [%{"startDate" => "2023-09-01", "endDate" => "2023-09-30"}],
   "dimensions" => [%{"name" => "country"}],
   "metrics" => [
     %{"name" => "activeUsers"},
@@ -115,7 +244,7 @@ report = %{
 
 ```
 %{
-  "dateRanges" => [%{"endDate" => "2023-09-15", "startDate" => "2023-09-01"}],
+  "dateRanges" => [%{"endDate" => "2023-09-30", "startDate" => "2023-09-01"}],
   "dimensions" => [%{"name" => "country"}],
   "metrics" => [
     %{"name" => "activeUsers"},
@@ -125,6 +254,8 @@ report = %{
   ]
 }
 ```
+
+Now we've defined our report above, lets post to the `:run_report` endpoint, passing the `:property_id` parameter and `:json` report payload as below:
 
 ```elixir
 # Run the report with the :run_report method
@@ -140,7 +271,7 @@ res = Req.post!(req, ga: :run_report, property_id: property_id, json: report)
     "alt-svc" => ["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],
     "cache-control" => ["private"],
     "content-type" => ["application/json; charset=UTF-8"],
-    "date" => ["Fri, 17 Nov 2023 13:03:11 GMT"],
+    "date" => ["Sat, 18 Nov 2023 06:40:30 GMT"],
     "server" => ["ESF"],
     "transfer-encoding" => ["chunked"],
     "vary" => ["Origin", "X-Origin", "Referer"],
@@ -159,13 +290,18 @@ res = Req.post!(req, ga: :run_report, property_id: property_id, json: report)
     columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate",
      "organicGoogleSearchClickThroughRate"],
     rows: [
-      ["Australia", 10089, 568807, 0.6080890737138641, 0.06607765656247402],
-      ["India", 46, 1022, 0.6730769230769231, 0.006472491909385114]
+      ["Australia", 18290, 1039744, 0.6172032919434016, 0.06392575853974243],
+      ["United States", 84, 2403, 0.6494845360824743, 0.004239977657602762],
+      ["India", 83, 2032, 0.6601941747572816, 0.007432100114760369],
+      ["Canada", 82, 2851, 0.5698924731182796, 0.013822202822639313],
+      ["New Zealand", 60, 2276, 0.5652173913043478, 0.028935185185185185],
+      ["United Kingdom", 56, 2550, 0.7205882352941176, 0.009810580333559731],
+      ["Philippines", 43, 2450, 0.6071428571428571, 0.00852099817407182]
     ],
     totals: nil,
     maximums: nil,
     minimums: nil,
-    count: 2,
+    count: 7,
     property_quota: nil,
     metadata: %{
       "currencyCode" => "AUD",
@@ -178,10 +314,14 @@ res = Req.post!(req, ga: :run_report, property_id: property_id, json: report)
 }
 ```
 
-The response body hold the data returned from the Google Analytics API end points:
+If successful (`status: 200` in the header) the response `:body` will hold the data returned from the Google Analytics API end point.
+
+If unsuccessfull (e.g. a `status: 404` in the header) the body will hold HTML containing information on the error. For example, the permissions may not have been set in Google Cloud Console.
+
+Lets look at the response `:body` below:
 
 ```elixir
-res.body
+country_data = res.body
 ```
 
 <!-- livebook:{"output":true} -->
@@ -198,13 +338,18 @@ res.body
   columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate",
    "organicGoogleSearchClickThroughRate"],
   rows: [
-    ["Australia", 10089, 568807, 0.6080890737138641, 0.06607765656247402],
-    ["India", 46, 1022, 0.6730769230769231, 0.006472491909385114]
+    ["Australia", 18290, 1039744, 0.6172032919434016, 0.06392575853974243],
+    ["United States", 84, 2403, 0.6494845360824743, 0.004239977657602762],
+    ["India", 83, 2032, 0.6601941747572816, 0.007432100114760369],
+    ["Canada", 82, 2851, 0.5698924731182796, 0.013822202822639313],
+    ["New Zealand", 60, 2276, 0.5652173913043478, 0.028935185185185185],
+    ["United Kingdom", 56, 2550, 0.7205882352941176, 0.009810580333559731],
+    ["Philippines", 43, 2450, 0.6071428571428571, 0.00852099817407182]
   ],
   totals: nil,
   maximums: nil,
   minimums: nil,
-  count: 2,
+  count: 7,
   property_quota: nil,
   metadata: %{
     "currencyCode" => "AUD",
@@ -214,40 +359,98 @@ res.body
 }
 ```
 
-The `%ReqGA.ReportResponse{}` implements the `Table.Response` protocol, which means it can be piped into `Kino.DataTable.new()`, `Explorer.DataFrame.new()` and other functions which implement it.
+You can see a populated `%ReqGA.ReportResponse{}` struct, containing the report data. Some of the struct's fields are blank as they're not relevant to the report query we sent.
+
+### Dimensions and metrics
+
+The `:dimensions` and `:metrics` key holds information about what dimensions and metrics are included in the report. The metrics also include type information in the tuple, for example `"activeUsers"` is of `"TYPE_INTEGER"`.
+
+### Metadata or ancillary information
+
+The `:count` key holds the number of `:rows` returned and the `:metadata` key may hold information related to the property and results, and in this case it's returned the currency code of `"AUD"` (Australia) and the time zone of `"Australia/Melbourne"` (this may be different for you). You'll also see in the metadata the a value for `"subjectToThresholding"`. When this is `true`, it means the report is subject to thresholding and only returns data that meets the minimum [aggregation thresholds](https://support.google.com/analytics/answer/9383630). In this case, GA4 may be witholding data to prevent anyone viewing a report from inferring the identity or sensitive information of individual users based on demographics, interests, or other signals present in the data.
+
+### Data of interest
+
+The data we're interested in sits within the `:rows` key. The column heading for each item in the row is under the `:columns` key.
+
+Note that as `%ReqGA.ReportResponse{}` implements the `Table.Response` protocol, the returned struct can be piped into `Kino.DataTable.new()`, `Explorer.DataFrame.new()` and other functions which are compatible with `Table.Response`.
+
+*Let's try that!*
 
 ```elixir
-res.body
-|> Kino.DataTable.new()
+# Visualise the report response in a Kino DataTable
+country_data |> Kino.DataTable.new()
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```text
-%ReqGA.ReportResponse{dimensions: ["country"], metrics: [{"activeUsers", "TYPE_INTEGER"}, {"userEngagementDuration", "TYPE_SECONDS"}, {"engagementRate", "TYPE_FLOAT"}, {"organicGoogleSearchClickThroughRate", "TYPE_FLOAT"}], columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate", "organicGoogleSearchClickThroughRate"], rows: [["Australia", 10089, 568807, 0.6080890737138641, 0.06607765656247402], ["India", 46, 1022, 0.6730769230769231, 0.006472491909385114]], totals: nil, maximums: nil, minimums: nil, count: 2, property_quota: nil, metadata: %{"currencyCode" => "AUD", "subjectToThresholding" => true, "timeZone" => "Australia/Melbourne"}}
+%ReqGA.ReportResponse{dimensions: ["country"], metrics: [{"activeUsers", "TYPE_INTEGER"}, {"userEngagementDuration", "TYPE_SECONDS"}, {"engagementRate", "TYPE_FLOAT"}, {"organicGoogleSearchClickThroughRate", "TYPE_FLOAT"}], columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate", "organicGoogleSearchClickThroughRate"], rows: [["Australia", 18290, 1039744, 0.6172032919434016, 0.06392575853974243], ["United States", 84, 2403, 0.6494845360824743, 0.004239977657602762], ["India", 83, 2032, 0.6601941747572816, 0.007432100114760369], ["Canada", 82, 2851, 0.5698924731182796, 0.013822202822639313], ["New Zealand", 60, 2276, 0.5652173913043478, 0.028935185185185185], ["United Kingdom", 56, 2550, 0.7205882352941176, 0.009810580333559731], ["Philippines", 43, 2450, 0.6071428571428571, 0.00852099817407182]], totals: nil, maximums: nil, minimums: nil, count: 7, property_quota: nil, metadata: %{"currencyCode" => "AUD", "subjectToThresholding" => true, "timeZone" => "Australia/Melbourne"}}
 ```
 
 ```elixir
-res.body
-|> Explorer.DataFrame.new()
+# Let's put it into a DataFrame
+country_data |> Explorer.DataFrame.new()
 ```
 
 <!-- livebook:{"output":true} -->
 
 ```
 #Explorer.DataFrame<
-  Polars[2 x 5]
-  country string ["Australia", "India"]
-  activeUsers integer [10089, 46]
-  userEngagementDuration integer [568807, 1022]
-  engagementRate float [0.6080890737138641, 0.6730769230769231]
-  organicGoogleSearchClickThroughRate float [0.06607765656247402, 0.006472491909385114]
+  Polars[7 x 5]
+  country string ["Australia", "United States", "India", "Canada", "New Zealand", ...]
+  activeUsers integer [18290, 84, 83, 82, 60, ...]
+  userEngagementDuration integer [1039744, 2403, 2032, 2851, 2276, ...]
+  engagementRate float [0.6172032919434016, 0.6494845360824743, 0.6601941747572816,
+   0.5698924731182796, 0.5652173913043478, ...]
+  organicGoogleSearchClickThroughRate float [0.06392575853974243, 0.004239977657602762,
+   0.007432100114760369, 0.013822202822639313, 0.028935185185185185, ...]
 >
 ```
+
+The type data under the `:metrics` key is used to usher the data into the correct Elixir data type. As you can see, Explorer has correctly applied the right type for each column as it is compatible with the `Table.Reader` protocol. This is true of the previous example, where Kino has also picked up the correct type information.
+
+### Charting
+
+Let's visulise this as a Kino chart:
+
+<!-- livebook:{"attrs":{"chart_title":"Active users by country","height":350,"layers":[{"active":true,"chart_type":"bar","color_field":"country","color_field_aggregate":null,"color_field_bin":null,"color_field_scale_scheme":null,"color_field_type":"nominal","data_variable":"country_data","geodata_color":"blue","latitude_field":null,"longitude_field":null,"x_field":"activeUsers","x_field_aggregate":null,"x_field_bin":null,"x_field_scale_type":null,"x_field_type":"quantitative","y_field":"country","y_field_aggregate":null,"y_field_bin":null,"y_field_scale_type":null,"y_field_type":"nominal"}],"vl_alias":"Elixir.VegaLite","width":600},"chunks":null,"kind":"Elixir.KinoVegaLite.ChartCell","livebook_object":"smart_cell"} -->
+
+```elixir
+VegaLite.new(width: 600, height: 350, title: "Active users by country")
+|> VegaLite.data_from_values(country_data, only: ["activeUsers", "country"])
+|> VegaLite.mark(:bar)
+|> VegaLite.encode_field(:x, "activeUsers", type: :quantitative)
+|> VegaLite.encode_field(:y, "country", type: :nominal)
+|> VegaLite.encode_field(:color, "country", type: :nominal)
+```
+
+<!-- livebook:{"output":true} -->
+
+```vega-lite
+{"$schema":"https://vega.github.io/schema/vega-lite/v5.json","data":{"values":[{"activeUsers":18290,"country":"Australia"},{"activeUsers":84,"country":"United States"},{"activeUsers":83,"country":"India"},{"activeUsers":82,"country":"Canada"},{"activeUsers":60,"country":"New Zealand"},{"activeUsers":56,"country":"United Kingdom"},{"activeUsers":43,"country":"Philippines"}]},"encoding":{"color":{"field":"country","type":"nominal"},"x":{"field":"activeUsers","type":"quantitative"},"y":{"field":"country","type":"nominal"}},"height":350,"mark":"bar","title":"Active users by country","width":600}
+```
+
+In this example, it looks like the website is very well targetted to Australian users!
+
+You'll no doubt get a different result and feel free to experiment with the chart accordingly.
 
 ## Get metadata for a property
 
 Metadata allows you to gather dimensions and metrics (including custom dimensions and metrics) for the property.
+
+In the following example, we'll see if there are any custom events configured on our property To do this we'll:
+
+* call the `:metadata` endpoint for our property
+* access the `"dimensions"` key on the response
+* filter on the `"apiName"` key for dimensions starting with `"customEvent"`.
+
+Note that the `:metadata` endpoint requires one of the following OAuth scopes:
+
+* https://www.googleapis.com/auth/analytics.readonly
+* https://www.googleapis.com/auth/analytics
+
+*Lets take a look!*
 
 ```elixir
 # List the custom dimensions added to a property
@@ -528,9 +731,22 @@ Req.get!(req, ga: :metadata, property_id: property_id).body["dimensions"]
 ]
 ```
 
+That is a lot of custom events!
+
+If your GA4 property has no custom events, comment out or remove the line starting with `|> Enum.filter...` and re-run the command. You'll notice that it brings back ALL metrics and dimensions on the property, including those standard ones built in to GA4.
+
 ## Get custom dimension and metrics for a property
 
-The Admin API also allows you to query, add or update dimensions and metrics for a property.
+Because there are a range of APIs for interacting with GA4, sometimes there are some slight overlaps in terms of features.
+
+For example, the Admin API also allows you to query, add or update dimensions and metrics for a property.
+
+The results will be slightly different than above.
+
+The `:custom_dimensions` API call requires one of the following OAuth scopes:
+
+* https://www.googleapis.com/auth/analytics.readonly
+* https://www.googleapis.com/auth/analytics.edit
 
 Lets query it now:
 
@@ -550,7 +766,7 @@ res = Req.get!(req, ga: :custom_dimensions, property_id: property_id)
     "alt-svc" => ["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],
     "cache-control" => ["private"],
     "content-type" => ["application/json; charset=UTF-8"],
-    "date" => ["Fri, 17 Nov 2023 13:18:51 GMT"],
+    "date" => ["Sat, 18 Nov 2023 06:59:07 GMT"],
     "server" => ["ESF"],
     "transfer-encoding" => ["chunked"],
     "vary" => ["Origin", "X-Origin", "Referer"],
@@ -708,9 +924,9 @@ res = Req.get!(req, ga: :custom_dimensions, property_id: property_id)
 }
 ```
 
-Although it brings back a list of maps, it can be piped into a Kino DataTable or Explorer DataFrame if they have the same keys.
+Although it brings back a list of maps, it can be piped into a Kino DataTable or Explorer DataFrame *if* they have the same keys.
 
-In this example only some dimensions have descriptions, so we'll drop these first before piping into Kino DataTable
+However, in this example only *some* dimensions have `"descriptions"`, so we'll drop these first before piping into Kino DataTable:
 
 ```elixir
 res.body |> Enum.map(&Map.drop(&1, ["description"])) |> Kino.DataTable.new()
@@ -722,81 +938,37 @@ res.body |> Enum.map(&Map.drop(&1, ["description"])) |> Kino.DataTable.new()
 [%{"displayName" => "AUTO Event Timestamp", "parameterName" => "event_timestamp", "scope" => "EVENT"}, %{"displayName" => "AUTO GA Session ID", "parameterName" => "ga_session_id", "scope" => "EVENT"}, %{"displayName" => "AUTO User Pseudo ID", "parameterName" => "user_pseudo_id", "scope" => "USER"}, %{"displayName" => "Accordion on page", "parameterName" => "accordion_on_page", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 1", "parameterName" => "content_breadcrumb_path_lvl_1", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 2", "parameterName" => "content_breadcrumb_path_lvl_2", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 3", "parameterName" => "content_breadcrumb_path_lvl_3", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 4", "parameterName" => "content_breadcrumb_path_lvl_4", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 5", "parameterName" => "content_breadcrumb_path_lvl_5", "scope" => "EVENT"}, %{"displayName" => "Content avg read time", "parameterName" => "content_avg_read_time", "scope" => "EVENT"}, %{"displayName" => "Content publication name", "parameterName" => "content_publication_name", "scope" => "EVENT"}, %{"displayName" => "Content site section", "parameterName" => "content_site_section", "scope" => "EVENT"}, %{"displayName" => "Content site section count", "parameterName" => "content_section_count", "scope" => "EVENT"}, %{"displayName" => "Content type", "parameterName" => "content_type", "scope" => "EVENT"}, %{"displayName" => "Content word count range", "parameterName" => "content_wordcount_range", "scope" => "EVENT"}, %{"displayName" => "Department", "parameterName" => "department", "scope" => "EVENT"}, %{"displayName" => "Error Message", "parameterName" => "error_message", "scope" => "EVENT"}, %{"displayName" => "Event Data", "parameterName" => "event_data", "scope" => "EVENT"}, %{"displayName" => "File Extension", "parameterName" => "file_extension", "scope" => "EVENT"}, %{"displayName" => "File Name", "parameterName" => "file_name", "scope" => "EVENT"}, %{"displayName" => "File Size", "parameterName" => "file_size", "scope" => "EVENT"}, %{"displayName" => "File on Page", "parameterName" => "file_download_on_page", "scope" => "EVENT"}, %{"displayName" => "Form name", "parameterName" => "form_name", "scope" => "EVENT"}, %{"displayName" => "GTM container ID", "parameterName" => "gtm_container_id", "scope" => "EVENT"}, %{"displayName" => "GTM container version", "parameterName" => "gtm_container_version", "scope" => "EVENT"}, %{"displayName" => "Image Count", "parameterName" => "image_count", "scope" => "EVENT"}, %{"displayName" => "Image on Page", "parameterName" => "image_on_page", "scope" => "EVENT"}, %{"displayName" => "Link Classes", "parameterName" => "link_classes", "scope" => "EVENT"}, %{"displayName" => "Link Outbound", "parameterName" => "outbound", "scope" => "EVENT"}, %{"displayName" => "Link Text", "parameterName" => "link_text", "scope" => "EVENT"}, %{"displayName" => "Link URL", "parameterName" => "link_url", "scope" => "EVENT"}, %{"displayName" => "Page Location", "parameterName" => "page_location", "scope" => "EVENT"}, %{"displayName" => "Percent Scrolled", "parameterName" => "percent_scrolled", "scope" => "EVENT"}, %{"displayName" => "Search Term", "parameterName" => "search_term", "scope" => "EVENT"}, %{"displayName" => "Traffic type", "parameterName" => "traffic_type", "scope" => "EVENT"}, %{"displayName" => "URL Query", "parameterName" => "url_query", "scope" => "EVENT"}, %{"displayName" => "Video Title", "parameterName" => "video_title", "scope" => "EVENT"}, %{"displayName" => "Video URL", "parameterName" => "video_url", "scope" => "EVENT"}, %{"displayName" => "Video on Page", "parameterName" => "video_on_page", "scope" => "EVENT"}]
 ```
 
+You should see the list of custom dimensions for that property.
+
 ## Account summaries
 
-This uses the Google Analytics Admin API and requires one of the following OAuth scopes:
+The Admin API has a very convient features which allows you to see what accounts you have access to and what properties they contain.
+
+To make these calls, the Google Analytics Admin API and requires one of the following OAuth scopes:
 
 * https://www.googleapis.com/auth/analytics.readonly
 * https://www.googleapis.com/auth/analytics.edit
+
+Let's give it a go:
 
 ```elixir
 res = Req.get!(req, ga: :account_summaries)
 ```
 
-<!-- livebook:{"output":true} -->
+If you inspect the body, you'll see some nested structs:
 
-```
-%Req.Response{
-  status: 200,
-  headers: %{
-    "alt-svc" => ["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],
-    "cache-control" => ["private"],
-    "content-type" => ["application/json; charset=UTF-8"],
-    "date" => ["Fri, 17 Nov 2023 13:14:21 GMT"],
-    "server" => ["ESF"],
-    "transfer-encoding" => ["chunked"],
-    "vary" => ["Origin", "X-Origin", "Referer"],
-    "x-content-type-options" => ["nosniff"],
-    "x-frame-options" => ["SAMEORIGIN"],
-    "x-xss-protection" => ["0"]
-  },
-  body: %ReqGA.AccountList{
-    accounts: [
-      %ReqGA.Account{
-        account: "accounts/120824569",
-        display_name: "....",
-        resource_name: "accountSummaries/120824569",
-        create_time: nil,
-        update_time: nil,
-        region_code: nil,
-        property_summaries: [
-          %ReqGA.Property{
-            ...
-          }
-        ]
-      },
-      %ReqGA.Account{
-        account: "accounts/123138994",
-        display_name: "...",
-        resource_name: "accountSummaries/123138994",
-        create_time: nil,
-        update_time: nil,
-        region_code: nil,
-        property_summaries: [
-          %ReqGA.Property{
-            ...
-          },
-          %ReqGA.Property{
-           ...
-          }
-        ]
-      }
-    ...
-    ],
-    count: 4
-  },
-  trailers: %{},
-  private: %{}
-}
-```
+* `%ReqGA.AccountList{}`; with a list of:
+* `%ReqGA.Account{}`; with a list of:
+* `%ReqGA.Property{}`.
+
+This structure will flatten out into a tabular format, if you pipe it into `Kino.DataTable.new()` or `Explorer.DataFrame.new()`... or even into `Table.Response.init()` if you want the raw flattened data structure.
 
 ```elixir
 res.body |> Kino.DataTable.new()
 ```
 
-<!-- livebook:{"output":true} -->
+*That ends our ReqGA demo!*
 
-```text
-```
+Hopefully this has given you a sense of how you can use `ReqGA` with `Req` and `Goth` for interacting with Google Analytics 4 APIs.
 
-<!-- livebook:{"offset":66298,"stamp":{"token":"XCP._SmtZwoDT6yQY0SsQoTgX4bnHy1JT1NXFa9yvSad2bi983v3D_by3VhtYDuo679JHV24JxD7MYKsMiYEGutZR4MaY0g40eDyjKyAtg","version":2}} -->
+<!-- livebook:{"offset":43177,"stamp":{"token":"XCP.CP6AOXUW7ZKZzYH09dts8NP54VqheJ-HDkg6yO9OFkDtH0BJ3K6sJS2rWU1D8Dex0Rkr1SfLveDcEiHa9H3Omoc9xe5n0Kd4fNFaSQ","version":2}} -->

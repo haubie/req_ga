@@ -11,6 +11,21 @@ ReqGA is a minimal [Req](https://hex.pm/packages/req) plugin for [Google Google 
 ### Status
 This is an *early draft* and currently under development.
 
+It current supports hte following GA4 API endpoints:
+
+| :ga API method            | API       | Endpoint                  | Req HTTP method supported |
+| ------------------------- | --------- | ------------------------- | ------------------------- |
+| :run_report               | Data API  | ":runReport"              | post                      |
+| :batch_run_reports        | Data API  | ":batchRunReports"        | post                      |
+| :run_pivot_report         | Data API  | ":runPivotReport"         | post                      |
+| :batch_run_pivot_reports  | Data API  | ":batchRunPivotReports"   | post                      |
+| :run_realtime_report      | Data API  | ":runRealtimeReport"      | post                      |
+| :check_compatibility      | Data API  | ":checkCompatibility"     | post                      |
+| :metadata                 | Data API  | "/metadata"               | get                       |
+| :account_summaries        | Admin API | "/accountSummaries"       | get                       |
+| :custom_dimensions        | Admin API | "/customDimensions"       | get, post                 |
+| :custom_metrics           | Admin API | "/customMetrics"          | get, post                 |
+
 ### What is Req?
 Req is an excellent, ergonomic and extensibile HTTP client for Elixir. It allows custom request and response steps, which ReqGA uses to interact with Google Analytics API endpoints.
 
