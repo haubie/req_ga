@@ -15,6 +15,8 @@ defmodule ReqGA do
   | :account_summaries        | Admin API | "/accountSummaries"       | get                       |
   | :custom_dimensions        | Admin API | "/customDimensions"       | get, post                 |
   | :custom_metrics           | Admin API | "/customMetrics"          | get, post                 |
+  | :accounts                 | Admin API | "/accounts"               | get                       |
+  | :properties               | Admin API | "/accounts"               | get                       |
 
 
   ## Example usage
@@ -187,7 +189,7 @@ defmodule ReqGA do
   
   """
 
-  @allowed_options ~w(goth ga property_id show_deleted)a
+  @allowed_options ~w(goth ga property_id show_deleted auto_page)a
 
   @base_admin_url "https://analyticsadmin.googleapis.com/v1beta"
   @base_data_url "https://analyticsdata.googleapis.com/v1beta"
@@ -200,10 +202,12 @@ defmodule ReqGA do
     run_realtime_report: "runRealtimeReport",
     metadata: "metadata",
     check_compatibility: "checkCompatibility",
+
     account_summaries: "accountSummaries",
     custom_dimensions: "customDimensions",
     custom_metrics: "customMetrics",
-    accounts: "accounts"
+    accounts: "accounts",
+    properties: "properties"
   ]
 
   alias Req.Request
@@ -245,12 +249,43 @@ defmodule ReqGA do
   ## Decode responses
   ## -------------------
   defp decode({request, %{status: 200} = response}) do
-    {request, update_in(response.body, &decode_body(&1, request.options))}
+    {request, update_in(response.body, &decode_body(&1, request))}
   end
   defp decode(any), do: any
 
+  # For properties (via Admin API)
+  defp recursive_decode_body(body, request, acc \\ []) 
+  defp recursive_decode_body(%{"properties" => properties, "nextPageToken"=>next_page}=_body, request, acc) do
+    process_current_page = ReqGA.PropertyList.new(properties, next_page)
 
-  
+    next_page_body =
+      request
+      |> Req.update(params: [pageToken: next_page])
+      |> then(fn r -> Req.update(r, url: %{r.url | query: URI.encode_query(r.options.params)}) end)
+      |> Req.get!()
+      |> then(fn r -> r.body end)
+
+    recursive_decode_body(next_page_body, request, acc ++ [process_current_page])
+  end
+  defp recursive_decode_body(%{"properties" => properties}=_body, _request, acc) do
+    all_pages = acc ++ [ReqGA.PropertyList.new(properties)]
+    props = Enum.flat_map(all_pages, & &1.properties)
+    %ReqGA.PropertyList{properties: props, count: length(props)}
+  end
+
+  defp decode_body(%{"properties" => _properties, "nextPageToken"=>_next_page}=body, %{options: %{auto_page: true}}=request) do
+    # Remove the :ga_decode step during the recursive process
+    request = update_in(request, [Access.key!(:response_steps)], &Keyword.delete(&1, :ga_decode))
+    recursive_decode_body(body, request) 
+  end
+
+  defp decode_body(%{"properties" => properties, "nextPageToken"=>page_token}=_body, _options) do
+    ReqGA.PropertyList.new(properties, page_token)
+  end
+
+  defp decode_body(%{"properties" => properties}=_body, _options) do
+    ReqGA.PropertyList.new(properties)
+  end
 
   # For accounts (via Admin API)
   defp decode_body(%{"accounts" => accounts}=_body, _options) do

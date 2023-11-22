@@ -14,12 +14,11 @@ defmodule ReqGA.Property do
       :account
     ]
   
-  
     def new(property) do
       %__MODULE__{
         display_name: property["displayName"],
         parent: property["parent"],
-        property: property["property"],
+        property: property["property"] || property["name"],
         property_type: property["propertyType"],
         resource_name: property["name"],
         create_time: property["createTime"],
