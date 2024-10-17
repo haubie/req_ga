@@ -20,7 +20,7 @@ defmodule ReqGa.MixProject do
         extras: [
           "README.md",
           "livebook/req_ga_demo.livemd",
-          {:"LICENSE", [title: "License (MIT)"]},
+          {:LICENSE, [title: "License (MIT)"]}
         ]
       ]
     ]
@@ -36,9 +36,9 @@ defmodule ReqGa.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:req, "~> 0.4.5"},
-      {:goth, "~> 1.3.0"},
-      {:table, "~> 0.1.1", optional: true},
+      {:req, "~> 0.4"},
+      {:goth, "~> 1.0"},
+      {:table, "~> 0.1", optional: true},
       {:ex_doc, ">= 0.0.0", only: :dev, runtime: false}
     ]
   end
@@ -49,12 +49,12 @@ defmodule ReqGa.MixProject do
         "lib",
         "mix.exs",
         "README.md",
-        "LICENSE",
+        "LICENSE"
       ],
       licenses: ["MIT"],
       links: %{
-        "GitHub" => "https://github.com/haubie/req_ga",
-        },
+        "GitHub" => "https://github.com/haubie/req_ga"
+      },
       maintainers: ["David Haubenschild"]
     ]
   end
