@@ -260,8 +260,8 @@ defmodule ReqGA do
 
     next_page_body =
       request
-      |> Req.update(params: [pageToken: next_page])
-      |> then(fn r -> Req.update(r, url: %{r.url | query: URI.encode_query(r.options.params)}) end)
+      |> Req.merge(params: [pageToken: next_page])
+      |> then(fn r -> Req.merge(r, url: %{r.url | query: URI.encode_query(r.options.params)}) end)
       |> Req.get!()
       |> then(fn r -> r.body end)
 
