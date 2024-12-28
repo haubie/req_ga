@@ -12,12 +12,14 @@ defmodule ReqGA do
   | :run_realtime_report      | Data API  | ":runRealtimeReport"      | post                      |
   | :check_compatibility      | Data API  | ":checkCompatibility"     | post                      |
   | :metadata                 | Data API  | "/metadata"               | get                       |
-  | :audience_list            | Data API  | "/audienceList"           | get                       |
+  | :audience_lists           | Data API  | "/audienceLists"           | get                       |
+  | :audience_exports         | Data API  | "/audienceExports"        | get                       |
   | :account_summaries        | Admin API | "/accountSummaries"       | get                       |
   | :custom_dimensions        | Admin API | "/customDimensions"       | get, post                 |
   | :custom_metrics           | Admin API | "/customMetrics"          | get, post                 |
-  | :accounts                 | Admin API | "/accounts"               | get                       |
-  | :properties               | Admin API | "/accounts"               | get                       |
+  | :accounts                 | Admin API | "/accounts"               | get, delete, post         |
+  | :properties               | Admin API | "/accounts"               | get, delete, post         |
+  | :key_events               | Admin API | "/keyEvents"              | get                       |
 
   ## Example usage
   ```
@@ -36,7 +38,7 @@ defmodule ReqGA do
   iex> source = {:service_account, credentials, [scopes: scopes]}
   iex> {:ok, _} = Goth.start_link(name: GA, source: source, http_client: &Req.request/1)
 
-  # Attach ReqGA to Req's request and response steps 
+  # Attach ReqGA to Req's request and response steps
   iex> req = Req.new() |> ReqGA.attach(goth: GA)
 
   # Query away!
@@ -58,7 +60,7 @@ defmodule ReqGA do
 
   # Run the report with the :run_report method
   iex> res = Req.post!(req, ga: :run_report, property_id: property_id, json: report)
-  
+
   # The response body will hold the decoded data
   iex> res.body
   %ReqGA.ReportResponse{
@@ -165,11 +167,11 @@ defmodule ReqGA do
   Returns a customized report of realtime event data for your property.
 
   This is equivalent of the Google Analytics Data API endpoint: `POST /v1beta/{property=properties/*}:runRealtimeReport`
-    
+
   Use `Req.post` or `Req.post!` with the following parameters:
   - `property_id:` an ID of the GA4 property in the format "properties/264264328"
   - `json: realtime_report_request` where realtime_report_request is a map representing a [JSON realtime report request](https://developers.google.com/analytics/devguides/reporting/data/v1/rest/v1beta/properties/runRealtimeReport)
-  
+
   ### :check_compatibility
   This compatibility method lists dimensions and metrics that can be added to a report request and maintain compatibility.
 
@@ -186,34 +188,36 @@ defmodule ReqGA do
 
   Use `Req.get` or `Req.get!` with the following parameters:
   - `property_id:` an ID of the GA4 property in the format "properties/264264328"
-  
+
   """
 
-  @allowed_options ~w(goth ga property_id show_deleted auto_page)a
+  @allowed_options ~w(goth ga property_id account_id show_deleted auto_page)a
 
   @base_admin_url "https://analyticsadmin.googleapis.com/v1beta"
   @base_data_url "https://analyticsdata.googleapis.com/v1beta"
   @base_data_alpha_url "https://analyticsdata.googleapis.com/v1alpha"
-  
+
   @ga_enpoints [
     run_report: "runReport",
     batch_run_reports: "batchRunReports",
-    run_pivot_report:  "runPivotReport",
+    run_pivot_report: "runPivotReport",
     batch_run_pivot_reports: "batchRunPivotReports",
     run_realtime_report: "runRealtimeReport",
     metadata: "metadata",
     check_compatibility: "checkCompatibility",
     audience_list: "/audienceList",
-
+    audience_exports: "audienceExports",
     account_summaries: "accountSummaries",
     custom_dimensions: "customDimensions",
     custom_metrics: "customMetrics",
     accounts: "accounts",
-    properties: "properties"
+    properties: "properties",
+    key_events: "keyEvents"
   ]
 
+  alias ReqGA.Property
   alias Req.Request
-  alias ReqGA.{AccountList, ReportResponse, PivotReportResponse}
+  alias ReqGA.{Account, AccountList, ReportResponse, PivotReportResponse}
 
   @doc """
   Attaches ReqGA to Req's request and response steps.
@@ -224,7 +228,7 @@ defmodule ReqGA do
   req = Req.new() |> ReqGA.attach(goth: GA)
   ```
   """
-  def attach(%Request{}=request, options \\ []) do
+  def attach(%Request{} = request, options \\ []) do
     request
     |> Request.prepend_request_steps(ga_run: &run/1)
     |> Request.register_options(@allowed_options)
@@ -235,12 +239,12 @@ defmodule ReqGA do
   ## Run the request
   ## -------------------
   defp run(%Request{options: options} = request) do
-      token = get_token(options)
-      uri = uri_for(options)
+    token = get_token(options)
+    uri = uri_for(options)
 
-      %{request | url: uri}
-      |> Request.merge_options(auth: {:bearer, token})
-      |> Request.append_response_steps(ga_decode: &decode/1) 
+    %{request | url: uri}
+    |> Request.merge_options(auth: {:bearer, token})
+    |> Request.append_response_steps(ga_decode: &decode/1)
   end
 
   defp run(%Request{} = request) do
@@ -253,11 +257,17 @@ defmodule ReqGA do
   defp decode({request, %{status: 200} = response}) do
     {request, update_in(response.body, &decode_body(&1, request))}
   end
+
   defp decode(any), do: any
 
   # For properties (via Admin API)
-  defp recursive_decode_body(body, request, acc \\ []) 
-  defp recursive_decode_body(%{"properties" => properties, "nextPageToken"=>next_page}=_body, request, acc) do
+  defp recursive_decode_body(body, request, acc \\ [])
+
+  defp recursive_decode_body(
+         %{"properties" => properties, "nextPageToken" => next_page} = _body,
+         request,
+         acc
+       ) do
     process_current_page = ReqGA.PropertyList.new(properties, next_page)
 
     next_page_body =
@@ -269,78 +279,93 @@ defmodule ReqGA do
 
     recursive_decode_body(next_page_body, request, acc ++ [process_current_page])
   end
-  defp recursive_decode_body(%{"properties" => properties}=_body, _request, acc) do
+
+  defp recursive_decode_body(%{"properties" => properties} = _body, _request, acc) do
     all_pages = acc ++ [ReqGA.PropertyList.new(properties)]
     props = Enum.flat_map(all_pages, & &1.properties)
     %ReqGA.PropertyList{properties: props, count: length(props)}
   end
 
-  defp decode_body(%{"properties" => _properties, "nextPageToken"=>_next_page}=body, %{options: %{auto_page: true}}=request) do
+  defp decode_body(
+         %{"properties" => _properties, "nextPageToken" => _next_page} = body,
+         %{options: %{auto_page: true}} = request
+       ) do
     # Remove the :ga_decode step during the recursive process
     request = update_in(request, [Access.key!(:response_steps)], &Keyword.delete(&1, :ga_decode))
-    recursive_decode_body(body, request) 
+    recursive_decode_body(body, request)
   end
 
-  defp decode_body(%{"properties" => properties, "nextPageToken"=>page_token}=_body, _options) do
+  defp decode_body(%{"properties" => properties, "nextPageToken" => page_token} = _body, _options) do
     ReqGA.PropertyList.new(properties, page_token)
   end
 
-  defp decode_body(%{"properties" => properties}=_body, _options) do
+  defp decode_body(%{"properties" => properties} = _body, _options) do
     ReqGA.PropertyList.new(properties)
   end
 
   # For accounts (via Admin API)
-  defp decode_body(%{"accounts" => accounts}=_body, _options) do
+  defp decode_body(%{"accounts" => accounts} = _body, _options) do
     AccountList.new(accounts)
   end
 
   # For account summaries (via Admin API)
-  defp decode_body(%{"accountSummaries" => accnt_summaries}=_body, _options) do
-      AccountList.new(accnt_summaries)
+  defp decode_body(%{"accountSummaries" => accnt_summaries} = _body, _options) do
+    AccountList.new(accnt_summaries)
   end
 
   # For custom dimensions (via Admin API)
-  defp decode_body(%{"customDimensions" => custom_dimensions}=_body, _options) do
+  defp decode_body(%{"customDimensions" => custom_dimensions} = _body, _options) do
     custom_dimensions
     |> Enum.map(fn cust_dimension -> Map.drop(cust_dimension, ["name"]) end)
-    |> Enum.sort(&(&1["displayName"] < &2["displayName"]))   
+    |> Enum.sort(&(&1["displayName"] < &2["displayName"]))
   end
 
   # For custom metrics (via Admin API)
-  defp decode_body(%{"customMetrics" => custom_metrics}=_body, _options) do
+  defp decode_body(%{"customMetrics" => custom_metrics} = _body, _options) do
     custom_metrics
     |> Enum.map(fn cust_dimension -> Map.drop(cust_dimension, ["name"]) end)
-    |> Enum.sort(&(&1["displayName"] < &2["displayName"]))   
+    |> Enum.sort(&(&1["displayName"] < &2["displayName"]))
   end
 
   # For reports (via Data API)
-  defp decode_body(%{"kind" => "analyticsData#runReport"}=body, _options) do
+  defp decode_body(%{"kind" => "analyticsData#runReport"} = body, _options) do
     ReportResponse.new(body)
   end
 
   # For batch reports (via Data API)
-  defp decode_body(%{"kind" => "analyticsData#batchRunReports"}=body, _options) do
+  defp decode_body(%{"kind" => "analyticsData#batchRunReports"} = body, _options) do
     Enum.map(body["reports"], fn report -> ReportResponse.new(report) end)
   end
 
-   # For pivot reports (via Data API)
-   defp decode_body(%{"kind" => "analyticsData#runPivotReport"}=body, _options) do
+  # For pivot reports (via Data API)
+  defp decode_body(%{"kind" => "analyticsData#runPivotReport"} = body, _options) do
     PivotReportResponse.new(body)
   end
 
   # For batch run pivot reports (via Data API)
-  defp decode_body(%{"kind" => "analyticsData#batchRunPivotReports"}=body, _options) do
+  defp decode_body(%{"kind" => "analyticsData#batchRunPivotReports"} = body, _options) do
     Enum.map(body["pivotReports"], fn report -> PivotReportResponse.new(report) end)
   end
 
   # For realtime reports (via Data API)
-  defp decode_body(%{"kind" => "analyticsData#runRealtimeReport"}=body, _options) do
+  defp decode_body(%{"kind" => "analyticsData#runRealtimeReport"} = body, _options) do
     ReportResponse.new(body)
   end
 
+  # For account get requests (via Admin API)
+  defp decode_body(body, %{method: :get, options: %{ga: :accounts}} = _options) do
+    Account.new(body)
+  end
+
+  # For properties get requests (via Admin API)
+  defp decode_body(body, %{method: :get, options: %{ga: :properties}} = _options) do
+    Property.new(body)
+  end
 
   # Catch all
-  defp decode_body(body, _options), do: body 
+  defp decode_body(body, _options) do
+    body
+  end
 
   ## --------------------
   ## Get token from Goth
@@ -355,58 +380,79 @@ defmodule ReqGA do
   ## -------------------
 
   # For compatibility check endpoint (via Data API)
-  defp uri_for(%{ga: :check_compatibility, property_id: property_id}=_options) do
+  defp uri_for(%{ga: :check_compatibility, property_id: property_id} = _options) do
     URI.parse("#{@base_data_url}/#{property_id}:checkCompatibility")
   end
 
   # For metadata endpoint (via Data API)
-  defp uri_for(%{ga: :metadata, property_id: property_id}=_options) do
+  defp uri_for(%{ga: :metadata, property_id: property_id} = _options) do
     URI.parse("#{@base_data_url}/#{property_id}/metadata")
   end
 
   # For run report (via Data API)
-  defp uri_for(%{ga: :run_report, property_id: property_id}=_options) do
+  defp uri_for(%{ga: :run_report, property_id: property_id} = _options) do
     URI.parse("#{@base_data_url}/#{property_id}:runReport")
   end
 
   # For batch run reports (via Data API)
-  defp uri_for(%{ga: :batch_run_reports, property_id: property_id}=_options) do
+  defp uri_for(%{ga: :batch_run_reports, property_id: property_id} = _options) do
     URI.parse("#{@base_data_url}/#{property_id}:batchRunReports")
   end
 
   # For run pivot report (via Data API)
-  defp uri_for(%{ga: :run_pivot_report, property_id: property_id}=_options) do
+  defp uri_for(%{ga: :run_pivot_report, property_id: property_id} = _options) do
     URI.parse("#{@base_data_url}/#{property_id}:runPivotReport")
   end
 
   # For batch run pivot reports (via Data API)
-  defp uri_for(%{ga: :batch_run_pivot_reports, property_id: property_id}=_options) do
+  defp uri_for(%{ga: :batch_run_pivot_reports, property_id: property_id} = _options) do
     URI.parse("#{@base_data_url}/#{property_id}:batchRunPivotReports")
   end
 
   # For run realtime report (via Data API)
-  defp uri_for(%{ga: :run_realtime_report, property_id: property_id}=_options) do
+  defp uri_for(%{ga: :run_realtime_report, property_id: property_id} = _options) do
     URI.parse("#{@base_data_url}/#{property_id}:runRealtimeReport")
   end
 
+  # For list audience exports (via Data API)
+  defp uri_for(%{ga: :audience_exports, property_id: property_id} = _options) do
+    URI.parse("#{@base_data_url}/#{property_id}/audienceExports")
+  end
+
   # For list audiences report (via Data API)
-  defp uri_for(%{ga: :audience_list, property_id: property_id}=_options) do
+  defp uri_for(%{ga: :audience_list, property_id: property_id} = _options) do
     URI.parse("#{@base_data_alpha_url}/#{property_id}/audienceLists")
   end
-  
-  # For a generic Admin API endpoint using a property ID 
-  defp uri_for(%{ga: ga_method, property_id: property_id}=_options) do
-    endpoint = Keyword.get(@ga_enpoints, ga_method) || raise "invalid :ga method. Valid :ga methods are: #{inspect(Keyword.keys(@ga_enpoints))}"
+
+  # For account actions using an account ID (via Admin API)
+  defp uri_for(%{ga: :accounts, account_id: account_id} = _options) do
+    URI.parse("#{@base_admin_url}/#{account_id}")
+  end
+
+  # For properties actions using an property ID (via Admin API)
+  defp uri_for(%{ga: :properties, property_id: property_id} = _options) do
+    URI.parse("#{@base_admin_url}/#{property_id}")
+  end
+
+  # For a generic Admin API endpoint using a property ID
+  defp uri_for(%{ga: ga_method, property_id: property_id} = _options) do
+    endpoint =
+      Keyword.get(@ga_enpoints, ga_method) ||
+        raise "invalid :ga method. Valid :ga methods are: #{inspect(Keyword.keys(@ga_enpoints))}"
 
     URI.parse("#{@base_admin_url}/#{property_id}/#{endpoint}")
   end
 
   # For a generic Admin API endpoint
   defp uri_for(options) do
-    ga_method = options[:ga] || raise ":ga is missing. Set :ga with one of the following: #{inspect(Keyword.keys(@ga_enpoints))}"
-    endpoint = Keyword.get(@ga_enpoints, ga_method) || raise "invalid :ga method. Valid :ga methods are: #{inspect(Keyword.keys(@ga_enpoints))}"
-    
+    ga_method =
+      options[:ga] ||
+        raise ":ga is missing. Set :ga with one of the following: #{inspect(Keyword.keys(@ga_enpoints))}"
+
+    endpoint =
+      Keyword.get(@ga_enpoints, ga_method) ||
+        raise "invalid :ga method. Valid :ga methods are: #{inspect(Keyword.keys(@ga_enpoints))}"
+
     URI.parse("#{@base_admin_url}/#{endpoint}")
   end
-
 end

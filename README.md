@@ -11,7 +11,7 @@ ReqGA is a minimal [Req](https://hex.pm/packages/req) plugin for [Google Google 
 ### Status
 This is an *early draft* and currently under development.
 
-It current supports hte following GA4 API endpoints:
+It current supports the following GA4 API endpoints:
 
 | :ga API method            | API       | Endpoint                  | Req HTTP method supported |
 | ------------------------- | --------- | ------------------------- | ------------------------- |
@@ -26,8 +26,8 @@ It current supports hte following GA4 API endpoints:
 | :account_summaries        | Admin API | "/accountSummaries"       | get                       |
 | :custom_dimensions        | Admin API | "/customDimensions"       | get, post                 |
 | :custom_metrics           | Admin API | "/customMetrics"          | get, post                 |
-| :accounts                 | Admin API | "/accounts"               | get                       |
-| :properties               | Admin API | "/accounts"               | get                       |
+| :accounts                 | Admin API | "/accounts"               | get, delete, post         |
+| :properties               | Admin API | "/accounts"               | get, delete, post         |
 
 ### What is Req?
 Req is an excellent, ergonomic and extensibile HTTP client for Elixir. It allows custom request and response steps, which ReqGA uses to interact with Google Analytics API endpoints.
@@ -134,14 +134,14 @@ The package can be installed by adding `req_ga` to your list of dependencies in 
 ```elixir
 def deps do
   [
-    {:req_ga, "~> 0.1.0"}
+    {:req_ga, "~> 0.1"}
   ]
 end
 ```
 
 ### Using within LiveBook and IEx
 ```elixir
-Mix.install([{:req_ga, "~> 0.1.0"}])
+Mix.install([{:req_ga, "~> 0.1"}])
 ```
 
 ## LiveBook demonstration

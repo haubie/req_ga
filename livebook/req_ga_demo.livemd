@@ -1,16 +1,16 @@
-<!-- livebook:{"file_entries":[{"file":{"file_system_id":"local","file_system_type":"local","path":"/Users/haubie/Development/livebook/credentials.json"},"name":"credentials.json","type":"file"}],"persist_outputs":true} -->
+<!-- livebook:{"file_entries":[{"file":{"file_system_id":"local","file_system_type":"local","path":"/Users/haubie/Development/livebook/credentials.json"},"name":"credentials.json","type":"file"}]} -->
 
 # ReqGA demonstration
 
 ```elixir
 Mix.install(
   [
-    {:req_ga, "~> 0.1.0"},
-    {:kino_db, "~> 0.2.1"},
-    {:goth, "~> 1.3.0"},
-    {:req, "~> 0.4.5"},
+    {:req_ga, "~> 0.1"},
+    {:kino_db, "~> 0.2"},
+    {:goth, "~> 1.3"},
+    {:req, "~> 0.4"},
     :explorer,
-    {:kino_vega_lite, "~> 0.1.10"}
+    {:kino_vega_lite, "~> 0.1"}
   ]
 )
 ```
@@ -54,18 +54,21 @@ The uses of ReqGA are only limited by what the GA4 APIs allow and your imaginati
 
 The table below summarises what GA4 API endpoints have been implemented so far:
 
-| :ga API method            | API       | Endpoint                  | Req HTTP method supported |
-| ------------------------- | --------- | ------------------------- | ------------------------- |
-| :run_report               | Data API  | ":runReport"              | post                      |
-| :batch_run_reports        | Data API  | ":batchRunReports"        | post                      |
-| :run_pivot_report         | Data API  | ":runPivotReport"         | post                      |
-| :batch_run_pivot_reports  | Data API  | ":batchRunPivotReports"   | post                      |
-| :run_realtime_report      | Data API  | ":runRealtimeReport"      | post                      |
-| :check_compatibility      | Data API  | ":checkCompatibility"     | post                      |
-| :metadata                 | Data API  | "/metadata"               | get                       |
-| :account_summaries        | Admin API | "/accountSummaries"       | get                       |
-| :custom_dimensions        | Admin API | "/customDimensions"       | get, post                 |
-| :custom_metrics           | Admin API | "/customMetrics"          | get, post                 |
+| :ga API method           | API       | Endpoint                | Req HTTP method supported |
+| ------------------------ | --------- | ----------------------- | ------------------------- |
+| :run_report              | Data API  | ":runReport"            | post                      |
+| :batch_run_reports       | Data API  | ":batchRunReports"      | post                      |
+| :run_pivot_report        | Data API  | ":runPivotReport"       | post                      |
+| :batch_run_pivot_reports | Data API  | ":batchRunPivotReports" | post                      |
+| :run_realtime_report     | Data API  | ":runRealtimeReport"    | post                      |
+| :check_compatibility     | Data API  | ":checkCompatibility"   | post                      |
+| :metadata                | Data API  | "/metadata"             | get                       |
+| :audience_lists          | Data API  | "/audienceLists"        | get                       |
+| :account_summaries       | Admin API | "/accountSummaries"     | get                       |
+| :custom_dimensions       | Admin API | "/customDimensions"     | get, post                 |
+| :custom_metrics          | Admin API | "/customMetrics"        | get, post                 |
+| :accounts                | Admin API | "/accounts"             | get, delete, post         |
+| :properties              | Admin API | "/accounts"             | get, delete, post         |
 
 Some endpoints are are quite simple and you'll use `Req.get` or `Req.get!` with the required parameters. Others will require a json payload where you'll use `Req.post` or `Req.post!`.
 
@@ -125,62 +128,12 @@ source = {:service_account, credentials, [scopes: scopes]}
 {:ok, _} = Goth.start_link(name: GA, source: source, http_client: &Req.request/1)
 ```
 
-<!-- livebook:{"output":true} -->
-
-```
-{:ok, #PID<0.325.0>}
-```
-
 ## Use Req GA4 plugin to query Google Analytics
 
 Attach ReqGA to Req's request and response steps:
 
 ```elixir
 req = Req.new() |> ReqGA.attach(goth: GA)
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-%Req.Request{
-  method: :get,
-  url: URI.parse(""),
-  headers: %{},
-  body: nil,
-  options: %{goth: GA},
-  registered_options: MapSet.new([:compress_body, :decode_json, :max_retries, :redirect_log_level,
-   :compressed, :max_redirects, :property_id, :base_url, :pool_timeout, :retry_log_level, :retry,
-   :receive_timeout, :range, :user_agent, :location_trusted, :auth, :redact_auth, :unix_socket,
-   :retry_delay, :goth, :json, :cache_dir, :finch, :redirect, :follow_redirects, :decode_body,
-   :redirect_trusted, :cache, :inet6, :finch_private, :path_params, :output, :finch_request, :raw,
-   :ga, :http_errors, :plug, :params, :form, :connect_options]),
-  halted: false,
-  adapter: &Req.Steps.run_finch/1,
-  request_steps: [
-    ga_run: #Function<0.112060180/1 in ReqGA.run>,
-    put_user_agent: &Req.Steps.put_user_agent/1,
-    compressed: &Req.Steps.compressed/1,
-    encode_body: &Req.Steps.encode_body/1,
-    put_base_url: &Req.Steps.put_base_url/1,
-    auth: &Req.Steps.auth/1,
-    put_params: &Req.Steps.put_params/1,
-    put_path_params: &Req.Steps.put_path_params/1,
-    put_range: &Req.Steps.put_range/1,
-    cache: &Req.Steps.cache/1,
-    put_plug: &Req.Steps.put_plug/1,
-    compress_body: &Req.Steps.compress_body/1
-  ],
-  response_steps: [
-    retry: &Req.Steps.retry/1,
-    redirect: &Req.Steps.redirect/1,
-    decompress_body: &Req.Steps.decompress_body/1,
-    decode_body: &Req.Steps.decode_body/1,
-    handle_http_errors: &Req.Steps.handle_http_errors/1,
-    output: &Req.Steps.output/1
-  ],
-  error_steps: [retry: &Req.Steps.retry/1],
-  private: %{}
-}
 ```
 
 ### Run a report
@@ -192,7 +145,7 @@ Below is an example of a simple report. For each **country** it asks for the num
 * active users
 * user engagement duration (in seconds)
 * engagement rate (a float representing the percentage); and the
-* organic Google Search click-through rate (also a float). 
+* organic Google Search click-through rate (also a float).
   It does this for the date range **"2023-09-01" to "2023-09-30"**.
 
 Feel free to:
@@ -225,26 +178,11 @@ Because Req automatically converts Elixir types into a valid json payload, you c
 
 ```elixir
 # ID of property to query. In the format "properties/<id number>"
-property_id = "properties/264264328"
+property_id = "properties/453770299"
 
 # Define a report to be posted
 report = %{
-  "dateRanges" => [%{"startDate" => "2023-09-01", "endDate" => "2023-09-30"}],
-  "dimensions" => [%{"name" => "country"}],
-  "metrics" => [
-    %{"name" => "activeUsers"},
-    %{"name" => "userEngagementDuration"},
-    %{"name" => "engagementRate"},
-    %{"name" => "organicGoogleSearchClickThroughRate"}
-  ]
-}
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-%{
-  "dateRanges" => [%{"endDate" => "2023-09-30", "startDate" => "2023-09-01"}],
+  "dateRanges" => [%{"startDate" => "2024-10-01", "endDate" => "2024-10-28"}],
   "dimensions" => [%{"name" => "country"}],
   "metrics" => [
     %{"name" => "activeUsers"},
@@ -262,58 +200,6 @@ Now we've defined our report above, lets post to the `:run_report` endpoint, pas
 res = Req.post!(req, ga: :run_report, property_id: property_id, json: report)
 ```
 
-<!-- livebook:{"output":true} -->
-
-```
-%Req.Response{
-  status: 200,
-  headers: %{
-    "alt-svc" => ["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],
-    "cache-control" => ["private"],
-    "content-type" => ["application/json; charset=UTF-8"],
-    "date" => ["Sat, 18 Nov 2023 06:40:30 GMT"],
-    "server" => ["ESF"],
-    "transfer-encoding" => ["chunked"],
-    "vary" => ["Origin", "X-Origin", "Referer"],
-    "x-content-type-options" => ["nosniff"],
-    "x-frame-options" => ["SAMEORIGIN"],
-    "x-xss-protection" => ["0"]
-  },
-  body: %ReqGA.ReportResponse{
-    dimensions: ["country"],
-    metrics: [
-      {"activeUsers", "TYPE_INTEGER"},
-      {"userEngagementDuration", "TYPE_SECONDS"},
-      {"engagementRate", "TYPE_FLOAT"},
-      {"organicGoogleSearchClickThroughRate", "TYPE_FLOAT"}
-    ],
-    columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate",
-     "organicGoogleSearchClickThroughRate"],
-    rows: [
-      ["Australia", 18290, 1039744, 0.6172032919434016, 0.06392575853974243],
-      ["United States", 84, 2403, 0.6494845360824743, 0.004239977657602762],
-      ["India", 83, 2032, 0.6601941747572816, 0.007432100114760369],
-      ["Canada", 82, 2851, 0.5698924731182796, 0.013822202822639313],
-      ["New Zealand", 60, 2276, 0.5652173913043478, 0.028935185185185185],
-      ["United Kingdom", 56, 2550, 0.7205882352941176, 0.009810580333559731],
-      ["Philippines", 43, 2450, 0.6071428571428571, 0.00852099817407182]
-    ],
-    totals: nil,
-    maximums: nil,
-    minimums: nil,
-    count: 7,
-    property_quota: nil,
-    metadata: %{
-      "currencyCode" => "AUD",
-      "subjectToThresholding" => true,
-      "timeZone" => "Australia/Melbourne"
-    }
-  },
-  trailers: %{},
-  private: %{}
-}
-```
-
 If successful (`status: 200` in the header) the response `:body` will hold the data returned from the Google Analytics API end point.
 
 If unsuccessfull (e.g. a `status: 404` in the header) the body will hold HTML containing information on the error. For example, the permissions may not have been set in Google Cloud Console.
@@ -322,41 +208,6 @@ Lets look at the response `:body` below:
 
 ```elixir
 country_data = res.body
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-%ReqGA.ReportResponse{
-  dimensions: ["country"],
-  metrics: [
-    {"activeUsers", "TYPE_INTEGER"},
-    {"userEngagementDuration", "TYPE_SECONDS"},
-    {"engagementRate", "TYPE_FLOAT"},
-    {"organicGoogleSearchClickThroughRate", "TYPE_FLOAT"}
-  ],
-  columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate",
-   "organicGoogleSearchClickThroughRate"],
-  rows: [
-    ["Australia", 18290, 1039744, 0.6172032919434016, 0.06392575853974243],
-    ["United States", 84, 2403, 0.6494845360824743, 0.004239977657602762],
-    ["India", 83, 2032, 0.6601941747572816, 0.007432100114760369],
-    ["Canada", 82, 2851, 0.5698924731182796, 0.013822202822639313],
-    ["New Zealand", 60, 2276, 0.5652173913043478, 0.028935185185185185],
-    ["United Kingdom", 56, 2550, 0.7205882352941176, 0.009810580333559731],
-    ["Philippines", 43, 2450, 0.6071428571428571, 0.00852099817407182]
-  ],
-  totals: nil,
-  maximums: nil,
-  minimums: nil,
-  count: 7,
-  property_quota: nil,
-  metadata: %{
-    "currencyCode" => "AUD",
-    "subjectToThresholding" => true,
-    "timeZone" => "Australia/Melbourne"
-  }
-}
 ```
 
 You can see a populated `%ReqGA.ReportResponse{}` struct, containing the report data. Some of the struct's fields are blank as they're not relevant to the report query we sent.
@@ -382,30 +233,9 @@ Note that as `%ReqGA.ReportResponse{}` implements the `Table.Response` protocol,
 country_data |> Kino.DataTable.new()
 ```
 
-<!-- livebook:{"output":true} -->
-
-```text
-%ReqGA.ReportResponse{dimensions: ["country"], metrics: [{"activeUsers", "TYPE_INTEGER"}, {"userEngagementDuration", "TYPE_SECONDS"}, {"engagementRate", "TYPE_FLOAT"}, {"organicGoogleSearchClickThroughRate", "TYPE_FLOAT"}], columns: ["country", "activeUsers", "userEngagementDuration", "engagementRate", "organicGoogleSearchClickThroughRate"], rows: [["Australia", 18290, 1039744, 0.6172032919434016, 0.06392575853974243], ["United States", 84, 2403, 0.6494845360824743, 0.004239977657602762], ["India", 83, 2032, 0.6601941747572816, 0.007432100114760369], ["Canada", 82, 2851, 0.5698924731182796, 0.013822202822639313], ["New Zealand", 60, 2276, 0.5652173913043478, 0.028935185185185185], ["United Kingdom", 56, 2550, 0.7205882352941176, 0.009810580333559731], ["Philippines", 43, 2450, 0.6071428571428571, 0.00852099817407182]], totals: nil, maximums: nil, minimums: nil, count: 7, property_quota: nil, metadata: %{"currencyCode" => "AUD", "subjectToThresholding" => true, "timeZone" => "Australia/Melbourne"}}
-```
-
 ```elixir
 # Let's put it into a DataFrame
 country_data |> Explorer.DataFrame.new()
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-#Explorer.DataFrame<
-  Polars[7 x 5]
-  country string ["Australia", "United States", "India", "Canada", "New Zealand", ...]
-  activeUsers integer [18290, 84, 83, 82, 60, ...]
-  userEngagementDuration integer [1039744, 2403, 2032, 2851, 2276, ...]
-  engagementRate float [0.6172032919434016, 0.6494845360824743, 0.6601941747572816,
-   0.5698924731182796, 0.5652173913043478, ...]
-  organicGoogleSearchClickThroughRate float [0.06392575853974243, 0.004239977657602762,
-   0.007432100114760369, 0.013822202822639313, 0.028935185185185185, ...]
->
 ```
 
 The type data under the `:metrics` key is used to usher the data into the correct Elixir data type. As you can see, Explorer has correctly applied the right type for each column as it is compatible with the `Table.Reader` protocol. This is true of the previous example, where Kino has also picked up the correct type information.
@@ -414,7 +244,7 @@ The type data under the `:metrics` key is used to usher the data into the correc
 
 Let's visulise this as a Kino chart:
 
-<!-- livebook:{"attrs":{"chart_title":"Active users by country","height":350,"layers":[{"active":true,"chart_type":"bar","color_field":"country","color_field_aggregate":null,"color_field_bin":null,"color_field_scale_scheme":null,"color_field_type":"nominal","data_variable":"country_data","geodata_color":"blue","latitude_field":null,"longitude_field":null,"x_field":"activeUsers","x_field_aggregate":null,"x_field_bin":null,"x_field_scale_type":null,"x_field_type":"quantitative","y_field":"country","y_field_aggregate":null,"y_field_bin":null,"y_field_scale_type":null,"y_field_type":"nominal"}],"vl_alias":"Elixir.VegaLite","width":600},"chunks":null,"kind":"Elixir.KinoVegaLite.ChartCell","livebook_object":"smart_cell"} -->
+<!-- livebook:{"attrs":"eyJjaGFydF90aXRsZSI6IkFjdGl2ZSB1c2VycyBieSBjb3VudHJ5IiwiaGVpZ2h0IjozNTAsImxheWVycyI6W3siYWN0aXZlIjp0cnVlLCJjaGFydF90eXBlIjoiYmFyIiwiY29sb3JfZmllbGQiOiJjb3VudHJ5IiwiY29sb3JfZmllbGRfYWdncmVnYXRlIjpudWxsLCJjb2xvcl9maWVsZF9iaW4iOm51bGwsImNvbG9yX2ZpZWxkX3NjYWxlX3NjaGVtZSI6bnVsbCwiY29sb3JfZmllbGRfdHlwZSI6Im5vbWluYWwiLCJkYXRhX3ZhcmlhYmxlIjoiY291bnRyeV9kYXRhIiwiZ2VvZGF0YV9jb2xvciI6ImJsdWUiLCJsYXRpdHVkZV9maWVsZCI6bnVsbCwibG9uZ2l0dWRlX2ZpZWxkIjpudWxsLCJ4X2ZpZWxkIjoiYWN0aXZlVXNlcnMiLCJ4X2ZpZWxkX2FnZ3JlZ2F0ZSI6bnVsbCwieF9maWVsZF9iaW4iOm51bGwsInhfZmllbGRfc2NhbGVfdHlwZSI6bnVsbCwieF9maWVsZF90eXBlIjoicXVhbnRpdGF0aXZlIiwieV9maWVsZCI6ImNvdW50cnkiLCJ5X2ZpZWxkX2FnZ3JlZ2F0ZSI6bnVsbCwieV9maWVsZF9iaW4iOm51bGwsInlfZmllbGRfc2NhbGVfdHlwZSI6bnVsbCwieV9maWVsZF90eXBlIjoibm9taW5hbCJ9XSwidmxfYWxpYXMiOiJFbGl4aXIuVmVnYUxpdGUiLCJ3aWR0aCI6NjAwfQ","chunks":null,"kind":"Elixir.KinoVegaLite.ChartCell","livebook_object":"smart_cell"} -->
 
 ```elixir
 VegaLite.new(width: 600, height: 350, title: "Active users by country")
@@ -423,12 +253,6 @@ VegaLite.new(width: 600, height: 350, title: "Active users by country")
 |> VegaLite.encode_field(:x, "activeUsers", type: :quantitative)
 |> VegaLite.encode_field(:y, "country", type: :nominal)
 |> VegaLite.encode_field(:color, "country", type: :nominal)
-```
-
-<!-- livebook:{"output":true} -->
-
-```vega-lite
-{"$schema":"https://vega.github.io/schema/vega-lite/v5.json","data":{"values":[{"activeUsers":18290,"country":"Australia"},{"activeUsers":84,"country":"United States"},{"activeUsers":83,"country":"India"},{"activeUsers":82,"country":"Canada"},{"activeUsers":60,"country":"New Zealand"},{"activeUsers":56,"country":"United Kingdom"},{"activeUsers":43,"country":"Philippines"}]},"encoding":{"color":{"field":"country","type":"nominal"},"x":{"field":"activeUsers","type":"quantitative"},"y":{"field":"country","type":"nominal"}},"height":350,"mark":"bar","title":"Active users by country","width":600}
 ```
 
 In this example, it looks like the website is very well targetted to Australian users!
@@ -458,279 +282,6 @@ Req.get!(req, ga: :metadata, property_id: property_id).body["dimensions"]
 |> Enum.filter(fn dimension -> String.starts_with?(dimension["apiName"], "customEvent") end)
 ```
 
-<!-- livebook:{"output":true} -->
-
-```
-[
-  %{
-    "apiName" => "customEvent:accordion_on_page",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Accordion on page"
-  },
-  %{
-    "apiName" => "customEvent:content_avg_read_time",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Content avg read time"
-  },
-  %{
-    "apiName" => "customEvent:content_breadcrumb_path_lvl_1",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Breadcrumb Level 1"
-  },
-  %{
-    "apiName" => "customEvent:content_breadcrumb_path_lvl_2",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Breadcrumb Level 2"
-  },
-  %{
-    "apiName" => "customEvent:content_breadcrumb_path_lvl_3",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Breadcrumb Level 3"
-  },
-  %{
-    "apiName" => "customEvent:content_breadcrumb_path_lvl_4",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Breadcrumb Level 4"
-  },
-  %{
-    "apiName" => "customEvent:content_breadcrumb_path_lvl_5",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Breadcrumb Level 5"
-  },
-  %{
-    "apiName" => "customEvent:content_publication_name",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Content publication name"
-  },
-  %{
-    "apiName" => "customEvent:content_section_count",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Content site section count"
-  },
-  %{
-    "apiName" => "customEvent:content_site_section",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Content site section"
-  },
-  %{
-    "apiName" => "customEvent:content_type",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Content type"
-  },
-  %{
-    "apiName" => "customEvent:content_wordcount_range",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Content word count range"
-  },
-  %{
-    "apiName" => "customEvent:department",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Department"
-  },
-  %{
-    "apiName" => "customEvent:error_message",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Error Message"
-  },
-  %{
-    "apiName" => "customEvent:event_data",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Event Data"
-  },
-  %{
-    "apiName" => "customEvent:event_timestamp",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "AUTO Event Timestamp"
-  },
-  %{
-    "apiName" => "customEvent:file_download_on_page",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "File on Page"
-  },
-  %{
-    "apiName" => "customEvent:file_extension",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "File Extension"
-  },
-  %{
-    "apiName" => "customEvent:file_name",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "File Name"
-  },
-  %{
-    "apiName" => "customEvent:file_size",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "File Size"
-  },
-  %{
-    "apiName" => "customEvent:form_name",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Form name"
-  },
-  %{
-    "apiName" => "customEvent:ga_session_id",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "AUTO GA Session ID"
-  },
-  %{
-    "apiName" => "customEvent:gtm_container_id",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "GTM container ID"
-  },
-  %{
-    "apiName" => "customEvent:gtm_container_version",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "GTM container version"
-  },
-  %{
-    "apiName" => "customEvent:image_count",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Image Count"
-  },
-  %{
-    "apiName" => "customEvent:image_on_page",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Image on Page"
-  },
-  %{
-    "apiName" => "customEvent:link_classes",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Link Classes"
-  },
-  %{
-    "apiName" => "customEvent:link_text",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Link Text"
-  },
-  %{
-    "apiName" => "customEvent:link_url",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Link URL"
-  },
-  %{
-    "apiName" => "customEvent:outbound",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Link Outbound"
-  },
-  %{
-    "apiName" => "customEvent:page_location",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Page Location"
-  },
-  %{
-    "apiName" => "customEvent:percent_scrolled",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Percent Scrolled"
-  },
-  %{
-    "apiName" => "customEvent:search_term",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Search Term"
-  },
-  %{
-    "apiName" => "customEvent:traffic_type",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Traffic type"
-  },
-  %{
-    "apiName" => "customEvent:url_query",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "URL Query"
-  },
-  %{
-    "apiName" => "customEvent:video_on_page",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Video on Page"
-  },
-  %{
-    "apiName" => "customEvent:video_title",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Video Title"
-  },
-  %{
-    "apiName" => "customEvent:video_url",
-    "category" => "Event-scoped Custom Dimension",
-    "customDefinition" => true,
-    "description" => "An event scoped custom dimension for your Analytics property.",
-    "uiName" => "Video URL"
-  }
-]
-```
-
 That is a lot of custom events!
 
 If your GA4 property has no custom events, comment out or remove the line starting with `|> Enum.filter...` and re-run the command. You'll notice that it brings back ALL metrics and dimensions on the property, including those standard ones built in to GA4.
@@ -752,176 +303,9 @@ Lets query it now:
 
 ```elixir
 # Enter an ID of a GA4 property in the following format:
-property_id = "properties/264264328"
+property_id = "properties/453770299"
 
 res = Req.get!(req, ga: :custom_dimensions, property_id: property_id)
-```
-
-<!-- livebook:{"output":true} -->
-
-```
-%Req.Response{
-  status: 200,
-  headers: %{
-    "alt-svc" => ["h3=\":443\"; ma=2592000,h3-29=\":443\"; ma=2592000"],
-    "cache-control" => ["private"],
-    "content-type" => ["application/json; charset=UTF-8"],
-    "date" => ["Sat, 18 Nov 2023 06:59:07 GMT"],
-    "server" => ["ESF"],
-    "transfer-encoding" => ["chunked"],
-    "vary" => ["Origin", "X-Origin", "Referer"],
-    "x-content-type-options" => ["nosniff"],
-    "x-frame-options" => ["SAMEORIGIN"],
-    "x-xss-protection" => ["0"]
-  },
-  body: [
-    %{
-      "description" => "This may not show up in GA4, only in BQ",
-      "displayName" => "AUTO Event Timestamp",
-      "parameterName" => "event_timestamp",
-      "scope" => "EVENT"
-    },
-    %{"displayName" => "AUTO GA Session ID", "parameterName" => "ga_session_id", "scope" => "EVENT"},
-    %{
-      "description" => "This may not show up in GA4, only in BQ",
-      "displayName" => "AUTO User Pseudo ID",
-      "parameterName" => "user_pseudo_id",
-      "scope" => "USER"
-    },
-    %{
-      "description" => "Yes/No Accordion on page",
-      "displayName" => "Accordion on page",
-      "parameterName" => "accordion_on_page",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "Breadcrumb Level 1",
-      "parameterName" => "content_breadcrumb_path_lvl_1",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "Breadcrumb Level 2",
-      "parameterName" => "content_breadcrumb_path_lvl_2",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "Breadcrumb Level 3",
-      "parameterName" => "content_breadcrumb_path_lvl_3",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "Breadcrumb Level 4",
-      "parameterName" => "content_breadcrumb_path_lvl_4",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "Breadcrumb Level 5",
-      "parameterName" => "content_breadcrumb_path_lvl_5",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "Content avg read time",
-      "parameterName" => "content_avg_read_time",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "Content publication name",
-      "parameterName" => "content_publication_name",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "Content site section",
-      "parameterName" => "content_site_section",
-      "scope" => "EVENT"
-    },
-    %{
-      "description" => "Count of H2 headings for section count",
-      "displayName" => "Content site section count",
-      "parameterName" => "content_section_count",
-      "scope" => "EVENT"
-    },
-    %{"displayName" => "Content type", "parameterName" => "content_type", "scope" => "EVENT"},
-    %{
-      "displayName" => "Content word count range",
-      "parameterName" => "content_wordcount_range",
-      "scope" => "EVENT"
-    },
-    %{"displayName" => "Department", "parameterName" => "department", "scope" => "EVENT"},
-    %{"displayName" => "Error Message", "parameterName" => "error_message", "scope" => "EVENT"},
-    %{"displayName" => "Event Data", "parameterName" => "event_data", "scope" => "EVENT"},
-    %{"displayName" => "File Extension", "parameterName" => "file_extension", "scope" => "EVENT"},
-    %{"displayName" => "File Name", "parameterName" => "file_name", "scope" => "EVENT"},
-    %{"displayName" => "File Size", "parameterName" => "file_size", "scope" => "EVENT"},
-    %{
-      "description" => "Yes/No if there is one or more files to download on the page.",
-      "displayName" => "File on Page",
-      "parameterName" => "file_download_on_page",
-      "scope" => "EVENT"
-    },
-    %{
-      "description" => "Name of a form",
-      "displayName" => "Form name",
-      "parameterName" => "form_name",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "GTM container ID",
-      "parameterName" => "gtm_container_id",
-      "scope" => "EVENT"
-    },
-    %{
-      "displayName" => "GTM container version",
-      "parameterName" => "gtm_container_version",
-      "scope" => "EVENT"
-    },
-    %{
-      "description" => "Count of images on page",
-      "displayName" => "Image Count",
-      "parameterName" => "image_count",
-      "scope" => "EVENT"
-    },
-    %{
-      "description" => "Yes/No for the presence of one or more images on a page",
-      "displayName" => "Image on Page",
-      "parameterName" => "image_on_page",
-      "scope" => "EVENT"
-    },
-    %{"displayName" => "Link Classes", "parameterName" => "link_classes", "scope" => "EVENT"},
-    %{
-      "description" => "True/False; True if the link click is external to the website. False if an internal link click.",
-      "displayName" => "Link Outbound",
-      "parameterName" => "outbound",
-      "scope" => "EVENT"
-    },
-    %{"displayName" => "Link Text", "parameterName" => "link_text", "scope" => "EVENT"},
-    %{"displayName" => "Link URL", "parameterName" => "link_url", "scope" => "EVENT"},
-    %{"displayName" => "Page Location", "parameterName" => "page_location", "scope" => "EVENT"},
-    %{
-      "description" => "The scroll depth threshold represented as a %",
-      "displayName" => "Percent Scrolled",
-      "parameterName" => "percent_scrolled",
-      "scope" => "EVENT"
-    },
-    %{"displayName" => "Search Term", "parameterName" => "search_term", "scope" => "EVENT"},
-    %{
-      "description" => "When traffic_type = internal this means the visitor is on a VPS IP range.",
-      "displayName" => "Traffic type",
-      "parameterName" => "traffic_type",
-      "scope" => "EVENT"
-    },
-    %{"displayName" => "URL Query", "parameterName" => "url_query", "scope" => "EVENT"},
-    %{"displayName" => "Video Title", "parameterName" => "video_title", "scope" => "EVENT"},
-    %{"displayName" => "Video URL", "parameterName" => "video_url", "scope" => "EVENT"},
-    %{
-      "description" => "Yes/No if there is a video embedded on the page.",
-      "displayName" => "Video on Page",
-      "parameterName" => "video_on_page",
-      "scope" => "EVENT"
-    }
-  ],
-  trailers: %{},
-  private: %{}
-}
 ```
 
 Although it brings back a list of maps, it can be piped into a Kino DataTable or Explorer DataFrame *if* they have the same keys.
@@ -930,12 +314,6 @@ However, in this example only *some* dimensions have `"descriptions"`, so we'll 
 
 ```elixir
 res.body |> Enum.map(&Map.drop(&1, ["description"])) |> Kino.DataTable.new()
-```
-
-<!-- livebook:{"output":true} -->
-
-```text
-[%{"displayName" => "AUTO Event Timestamp", "parameterName" => "event_timestamp", "scope" => "EVENT"}, %{"displayName" => "AUTO GA Session ID", "parameterName" => "ga_session_id", "scope" => "EVENT"}, %{"displayName" => "AUTO User Pseudo ID", "parameterName" => "user_pseudo_id", "scope" => "USER"}, %{"displayName" => "Accordion on page", "parameterName" => "accordion_on_page", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 1", "parameterName" => "content_breadcrumb_path_lvl_1", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 2", "parameterName" => "content_breadcrumb_path_lvl_2", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 3", "parameterName" => "content_breadcrumb_path_lvl_3", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 4", "parameterName" => "content_breadcrumb_path_lvl_4", "scope" => "EVENT"}, %{"displayName" => "Breadcrumb Level 5", "parameterName" => "content_breadcrumb_path_lvl_5", "scope" => "EVENT"}, %{"displayName" => "Content avg read time", "parameterName" => "content_avg_read_time", "scope" => "EVENT"}, %{"displayName" => "Content publication name", "parameterName" => "content_publication_name", "scope" => "EVENT"}, %{"displayName" => "Content site section", "parameterName" => "content_site_section", "scope" => "EVENT"}, %{"displayName" => "Content site section count", "parameterName" => "content_section_count", "scope" => "EVENT"}, %{"displayName" => "Content type", "parameterName" => "content_type", "scope" => "EVENT"}, %{"displayName" => "Content word count range", "parameterName" => "content_wordcount_range", "scope" => "EVENT"}, %{"displayName" => "Department", "parameterName" => "department", "scope" => "EVENT"}, %{"displayName" => "Error Message", "parameterName" => "error_message", "scope" => "EVENT"}, %{"displayName" => "Event Data", "parameterName" => "event_data", "scope" => "EVENT"}, %{"displayName" => "File Extension", "parameterName" => "file_extension", "scope" => "EVENT"}, %{"displayName" => "File Name", "parameterName" => "file_name", "scope" => "EVENT"}, %{"displayName" => "File Size", "parameterName" => "file_size", "scope" => "EVENT"}, %{"displayName" => "File on Page", "parameterName" => "file_download_on_page", "scope" => "EVENT"}, %{"displayName" => "Form name", "parameterName" => "form_name", "scope" => "EVENT"}, %{"displayName" => "GTM container ID", "parameterName" => "gtm_container_id", "scope" => "EVENT"}, %{"displayName" => "GTM container version", "parameterName" => "gtm_container_version", "scope" => "EVENT"}, %{"displayName" => "Image Count", "parameterName" => "image_count", "scope" => "EVENT"}, %{"displayName" => "Image on Page", "parameterName" => "image_on_page", "scope" => "EVENT"}, %{"displayName" => "Link Classes", "parameterName" => "link_classes", "scope" => "EVENT"}, %{"displayName" => "Link Outbound", "parameterName" => "outbound", "scope" => "EVENT"}, %{"displayName" => "Link Text", "parameterName" => "link_text", "scope" => "EVENT"}, %{"displayName" => "Link URL", "parameterName" => "link_url", "scope" => "EVENT"}, %{"displayName" => "Page Location", "parameterName" => "page_location", "scope" => "EVENT"}, %{"displayName" => "Percent Scrolled", "parameterName" => "percent_scrolled", "scope" => "EVENT"}, %{"displayName" => "Search Term", "parameterName" => "search_term", "scope" => "EVENT"}, %{"displayName" => "Traffic type", "parameterName" => "traffic_type", "scope" => "EVENT"}, %{"displayName" => "URL Query", "parameterName" => "url_query", "scope" => "EVENT"}, %{"displayName" => "Video Title", "parameterName" => "video_title", "scope" => "EVENT"}, %{"displayName" => "Video URL", "parameterName" => "video_url", "scope" => "EVENT"}, %{"displayName" => "Video on Page", "parameterName" => "video_on_page", "scope" => "EVENT"}]
 ```
 
 You should see the list of custom dimensions for that property.
@@ -967,8 +345,93 @@ This structure will flatten out into a tabular format, if you pipe it into `Kino
 res.body |> Kino.DataTable.new()
 ```
 
+## Single account lookup
+
+Likewise, a single account can be looked up by passing the `:account_id`. This requires the same OAuth scopes as above.
+
+```elixir
+account_id = "accounts/324831266"
+res = Req.get!(req, ga: :accounts, account_id: account_id)
+```
+
+```elixir
+res.body
+```
+
+There are other single account methods such as **delete**.
+
+The Google Analytics Admin API and requires the following OAuth scopes to delete the account:
+
+* https://www.googleapis.com/auth/analytics.edit
+
+And you can call Req's delete function as follows:
+
+```
+Req.delete!(req, ga: :accounts, account_id: account_id)
+```
+
+## Single property lookup
+
+Single properties can also be looked up.
+
+The Google Analytics Admin API requires one of the following OAuth scopes:
+
+* https://www.googleapis.com/auth/analytics.readonly
+* https://www.googleapis.com/auth/analytics.edit
+
+```elixir
+property_id = "properties/471246375"
+res = Req.get!(req, ga: :properties, property_id: property_id)
+```
+
+```elixir
+res.body
+```
+
+There are other single property methods such as **delete**.
+
+The Google Analytics Admin API and requires the following OAuth scope to delete the property:
+
+* https://www.googleapis.com/auth/analytics.edit
+
+And you can call Req's delete function as follows:
+
+```
+property_id = "properties/471246375"
+res = Req.delete!(req, ga: :properties, property_id: property_id)
+```
+
+## Adding a custom dimension
+
+```elixir
+property_id = "properties/471246375"
+
+custom_dimension_data = %{
+  "parameterName" => "page_type",
+  "displayName" => "Page type",
+  "description" => "The type of page, such as a Landing page, Article, Blog, etc.",
+  "scope" => "EVENT"
+}
+
+res = Req.post!(req, ga: :custom_dimensions, property_id: property_id, json: custom_dimension_data)
+```
+
+## List key events for a property
+
+```elixir
+property_id = "properties/453770299"
+res = Req.get!(req, ga: :key_events, property_id: property_id)
+```
+
+## List audiences for a property
+
+```elixir
+property_id = "properties/453770299"
+res = Req.get!(req, ga: :audience_list, property_id: property_id)
+```
+
 *That ends our ReqGA demo!*
 
 Hopefully this has given you a sense of how you can use `ReqGA` with `Req` and `Goth` for interacting with Google Analytics 4 APIs.
 
-<!-- livebook:{"offset":43177,"stamp":{"token":"XCP.CP6AOXUW7ZKZzYH09dts8NP54VqheJ-HDkg6yO9OFkDtH0BJ3K6sJS2rWU1D8Dex0Rkr1SfLveDcEiHa9H3Omoc9xe5n0Kd4fNFaSQ","version":2}} -->
+<!-- livebook:{"offset":19147,"stamp":{"token":"XCP.5aj-ecK-2PEJ0GYqkXHRAo4Tfo5TTehYyO6tP3nN4p0eSQX7Y9v-yCdn-mmHjtY4VYNnnhP33r4dt2ZUjf65X--Bxq8k8N51PIYxdA","version":2}} -->
