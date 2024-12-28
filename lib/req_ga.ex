@@ -12,12 +12,12 @@ defmodule ReqGA do
   | :run_realtime_report      | Data API  | ":runRealtimeReport"      | post                      |
   | :check_compatibility      | Data API  | ":checkCompatibility"     | post                      |
   | :metadata                 | Data API  | "/metadata"               | get                       |
+  | :audience_list            | Data API  | "/audienceList"           | get                       |
   | :account_summaries        | Admin API | "/accountSummaries"       | get                       |
   | :custom_dimensions        | Admin API | "/customDimensions"       | get, post                 |
   | :custom_metrics           | Admin API | "/customMetrics"          | get, post                 |
   | :accounts                 | Admin API | "/accounts"               | get                       |
   | :properties               | Admin API | "/accounts"               | get                       |
-
 
   ## Example usage
   ```
@@ -193,6 +193,7 @@ defmodule ReqGA do
 
   @base_admin_url "https://analyticsadmin.googleapis.com/v1beta"
   @base_data_url "https://analyticsdata.googleapis.com/v1beta"
+  @base_data_alpha_url "https://analyticsdata.googleapis.com/v1alpha"
   
   @ga_enpoints [
     run_report: "runReport",
@@ -202,6 +203,7 @@ defmodule ReqGA do
     run_realtime_report: "runRealtimeReport",
     metadata: "metadata",
     check_compatibility: "checkCompatibility",
+    audience_list: "/audienceList",
 
     account_summaries: "accountSummaries",
     custom_dimensions: "customDimensions",
@@ -387,6 +389,11 @@ defmodule ReqGA do
     URI.parse("#{@base_data_url}/#{property_id}:runRealtimeReport")
   end
 
+  # For list audiences report (via Data API)
+  defp uri_for(%{ga: :audience_list, property_id: property_id}=_options) do
+    URI.parse("#{@base_data_alpha_url}/#{property_id}/audienceLists")
+  end
+  
   # For a generic Admin API endpoint using a property ID 
   defp uri_for(%{ga: ga_method, property_id: property_id}=_options) do
     endpoint = Keyword.get(@ga_enpoints, ga_method) || raise "invalid :ga method. Valid :ga methods are: #{inspect(Keyword.keys(@ga_enpoints))}"

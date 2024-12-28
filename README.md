@@ -1,4 +1,4 @@
-![Midiex](assets/req_ga_logo_wide.png)
+![ReqGA](assets/req_ga_logo_wide.png)
 
 [![Documentation](http://img.shields.io/badge/hex.pm-docs-green.svg?style=flat)](https://hexdocs.pm/req_ga)
 [![Package](https://img.shields.io/hexpm/v/req_ga.svg)](https://hex.pm/packages/req_ga)
@@ -22,9 +22,12 @@ It current supports hte following GA4 API endpoints:
 | :run_realtime_report      | Data API  | ":runRealtimeReport"      | post                      |
 | :check_compatibility      | Data API  | ":checkCompatibility"     | post                      |
 | :metadata                 | Data API  | "/metadata"               | get                       |
+| :audience_list            | Data API  | "/audienceList"           | get                       |
 | :account_summaries        | Admin API | "/accountSummaries"       | get                       |
 | :custom_dimensions        | Admin API | "/customDimensions"       | get, post                 |
 | :custom_metrics           | Admin API | "/customMetrics"          | get, post                 |
+| :accounts                 | Admin API | "/accounts"               | get                       |
+| :properties               | Admin API | "/accounts"               | get                       |
 
 ### What is Req?
 Req is an excellent, ergonomic and extensibile HTTP client for Elixir. It allows custom request and response steps, which ReqGA uses to interact with Google Analytics API endpoints.
@@ -51,7 +54,6 @@ Some of the Structs implement the `Table.Reader` protocol (https://hex.pm/packag
 
 This makes it easier to view in LiveBook as a table by piping it to [`Kino.DataTable.new/2`](https://hexdocs.pm/kino/Kino.DataTable.html#new/2) or for creating a DataFrame with [`Explorer.DataFrame.new/2`](https://hexdocs.pm/explorer/Explorer.DataFrame.html#new/2).
 
-
 ## Related packages
 You may also be interested in the [ReqBigQuery](https://hex.pm/packages/req_bigquery) which is a Req plugin for [BigQuery](https://cloud.google.com/bigquery).
 
@@ -72,7 +74,7 @@ iex> scopes = [
 iex> source = {:service_account, credentials, [scopes: scopes]}
 iex> {:ok, _} = Goth.start_link(name: GA, source: source, http_client: &Req.request/1)
 
-# Attach ReqGA to Req's request and response steps 
+# Attach ReqGA to Req's request and response steps
 iex> req = Req.new() |> ReqGA.attach(goth: GA)
 
 # Query away!
@@ -126,7 +128,7 @@ iex> res.body
 
 ## Installation
 
-### Adding it to your Elixir project 
+### Adding it to your Elixir project
 The package can be installed by adding `req_ga` to your list of dependencies in `mix.exs`:
 
 ```elixir
@@ -147,4 +149,3 @@ Also see the demo in LiveBook at [/livebook/req_ga_demo.livemd.livemd](/livebook
 
 ## Documentation
 The docs can be found at <https://hexdocs.pm/req_ga>.
-
