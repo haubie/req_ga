@@ -1,4 +1,21 @@
 defmodule ReqGA.ReportResponse do
+  @doc """
+  A struct representing a report response
+
+    Has the following keys:
+    - `dimensions:` a list of the dimension in the report
+    - `metrics:` a list of the metric names in the report as well as their type, in tuple format e.g. `{"activeUsers", "TYPE_INTEGER"}`
+    - `columns:` the column names for each row (dimension names first, followed by metric names)
+    - `rows:` a list containing the row's data
+    - `totals:` used for reports with total
+    - `maximums:` used for reports with maximums
+    - `minimums:` used for reports with minimums
+    - `count:` the number of results (rows)
+    - `property_quota:` property quota data (if returned)
+    - `metadata:` associated with the report and property, such as currency code, time zone information and if the data is subject to thresholding.
+
+    Implements the `Table.Reader` reader protocol.
+  """
   defstruct [:dimensions, :metrics, :columns, :rows, :totals, :maximums, :minimums, :count, :property_quota, metadata: %{}]
     
   def new(body) do
@@ -56,7 +73,6 @@ defmodule ReqGA.ReportResponse do
   defp maybe_convert(value, _type), do: value    
 
 end
-
 
 if Code.ensure_loaded?(Table.Reader) do
   defimpl Table.Reader, for: ReqGA.ReportResponse do

@@ -2,9 +2,10 @@ defmodule ReqGA.PropertyList do
     @moduledoc """
     A struct containing a list of `%ReqGA.Property{}`. This represents a Google Analytics property.
 
-    Has two keys:
+    Has three keys:
     - `properties:` a list of populated `%ReqGA.Property{}` structus
     - `count:` the number of properties in the properties list
+    - `page_token:` the token of the next page for multi-page responses.
 
     Implements the `Table.Reader` reader protocol.
     """

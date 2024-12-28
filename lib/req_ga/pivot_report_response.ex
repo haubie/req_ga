@@ -1,5 +1,21 @@
 defmodule ReqGA.PivotReportResponse do
-  defstruct [:dimensions, :metrics, :pivot_headers, :columns, :rows, :aggregates, :property_quota, metadata: %{}]
+  @doc """
+  A struct representing a pivot report response
+
+    Has the following keys:
+    - `dimensions:` a list of the dimension in the report
+    - `metrics:` a list of the metric names in the report as well as their type, in tuple format e.g. `{"activeUsers", "TYPE_INTEGER"}`
+    - `pivot_headers:` the names for each 'column'
+    - `rows:` a list containing the row's data
+    - `totals:` used for reports with total
+    - `count:` the number of rows
+    - `aggregates:` aggregate data (if returned)
+    - `property_quota:` property quota data (if returned)
+    - `metadata:` associated with the report and property, such as currency code, time zone information and if the data is subject to thresholding.
+
+    Implements the `Table.Reader` reader protocol.
+  """
+  defstruct [:dimensions, :metrics, :pivot_headers, :columns, :rows, :count, :aggregates, :property_quota, metadata: %{}]
     
   def new(body) do
     dimensions = parse_dimensions(body["dimensionHeaders"])
@@ -12,6 +28,7 @@ defmodule ReqGA.PivotReportResponse do
       columns: columns,
       pivot_headers: body["pivotHeaders"],
       rows: if(body["rows"], do: parse_rows(body["rows"], metrics), else: nil),
+      count: if(body["rows"], do: length(body["rows"]), else: nil),
       aggregates: body["aggregates"],
       metadata: body["metadata"],
       property_quota: body["propertyQuota"]
@@ -62,9 +79,6 @@ defmodule ReqGA.PivotReportResponse do
   #   ]
   # }
 
-
-
-
   defp parse_dimensions(dimensions) do
     Enum.map(dimensions, fn %{"name" => dimension} -> dimension end)
   end
@@ -99,11 +113,10 @@ defmodule ReqGA.PivotReportResponse do
 
 end
 
-
 if Code.ensure_loaded?(Table.Reader) do
   defimpl Table.Reader, for: ReqGA.PivotReportResponse do
     def init(report_response) do
-      {:rows, %{columns: report_response.columns, count: length(report_response.rows)}, report_response.rows}
+      {:rows, %{columns: report_response.columns, count: report_response.count}, report_response.rows}
     end
   end
 end
