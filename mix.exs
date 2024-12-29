@@ -6,7 +6,7 @@ defmodule ReqGa.MixProject do
       app: :req_ga,
       name: "ReqGA",
       description: "A plugin for Req for interacting with Google Analytics 4 APIs.",
-      version: "0.1.1",
+      version: "0.1.2",
       elixir: "~> 1.15",
       start_permanent: Mix.env() == :prod,
       deps: deps(),
